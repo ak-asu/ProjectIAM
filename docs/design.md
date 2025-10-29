@@ -155,8 +155,7 @@ sequenceDiagram
 
     H->>API: POST /api/issuer/request-credential (Holder DID, degree info)
     API->>I: GET issuer-provided APIs for credentials
-   4 Note over I, API: *Issuer should provide APIs*
-    I-->>API: Return credentials
+   I-->>API: Return credentials
     API->>API: Generate & sign VC JSON (Holder DID, credential data)
     API->>IPFS: Upload encrypted VC (AES-GCM with Holder’s public key)
     IPFS-->>API: Return IPFS CID
@@ -164,6 +163,7 @@ sequenceDiagram
     SC-->>API: Tx success (status: Active)
     API-->>H: Return credential information (on-chain & off-chain)
 ```
+
 ### 4.3 Auth & Caller Identity
 - Transport: HTTPS only
 - Authorization & Identification: Each request should be authenticated by DID.
