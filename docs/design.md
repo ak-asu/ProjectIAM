@@ -1,10 +1,10 @@
 # Zero-Knowledge Credential Verification System on Polygon
 
-## **1. Concepts**
+## 1. Concepts
 
-### **1.1 Decentralized Identifiers (DIDs)**
-A **Decentralized Identifier (DID)** uniquely represents an entity (Issuer, Holder, or Verifier).
-Each DID corresponds to a **DID Document** containing public keys and endpoints for authentication and proof verification.
+### 1.1 Decentralized Identifiers (DIDs)
+A Decentralized Identifier (DID) uniquely represents an entity (Issuer, Holder, or Verifier).
+Each DID corresponds to a DID Document containing public keys and endpoints for authentication and proof verification.
 
 Example:
 ```json
@@ -19,14 +19,14 @@ Example:
 }
 ```
 
-- **Issuer DID** → The university (trusted credential issuer).
-- **Holder DID** → The student’s identity, managed in a Polygon ID wallet.
-- **Verifier DID** → (Optional) The organization verifying the credential.
+- Issuer DID → The university (trusted credential issuer).
+- Holder DID → The student’s identity, managed in a Polygon ID wallet.
+- Verifier DID → (Optional) The organization verifying the credential.
 
 
 
-### **1.2 Verifiable Credentials (VCs)**
-A **VC** is a signed digital credential issued by an Issuer to a Holder’s DID.
+### 1.2 Verifiable Credentials (VCs)
+A VC is a signed digital credential issued by an Issuer to a Holder’s DID.
 It includes claims, such as degree type and graduation date, and the Issuer’s cryptographic signature (VC proof).
 
 ```json
@@ -50,41 +50,41 @@ It includes claims, such as degree type and graduation date, and the Issuer’s 
 }
 ```
 
-Note: The `proof` field is **the Issuer’s digital signature**, proving authenticity. It is **not** the Holder’s ZK proof.
+Note: The `proof` field is the Issuer’s digital signature, proving authenticity. It is not the Holder’s ZK proof.
 
-### **1.3 Zero-Knowledge Proofs (ZKPs)**
-Later, the Holder generates a **ZK proof** derived from the VC.
+### 1.3 Zero-Knowledge Proofs (ZKPs)
+Later, the Holder generates a ZK proof derived from the VC.
 This allows proving statements like *“I have a degree from a valid Issuer”* without revealing personal data.
 
-### **1.4 On-Chain Anchoring**
+### 1.4 On-Chain Anchoring
 To keep data private:
-- **Only hashes and statuses** are stored on-chain:
+- Only hashes and statuses are stored on-chain:
   - `credHash = keccak256(vcCanonicalForm)`
   - `issuerDidHash`
   - `schemaHash`
   - status (`Active` / `Revoked`)
-- The **encrypted VC** itself is stored in IPFS (AES-GCM encrypted with the Holder’s public key).
+- The encrypted VC itself is stored in IPFS (AES-GCM encrypted with the Holder’s public key).
 
 This design ensures public verifiability without leaking sensitive data.
 
-## **2. End-to-End User Stories**
+## 2. End-to-End User Stories
 
-### **Story 1 — Credential Issuance**
-1. **Holder (student)** requests a credential from **Issuer (university)**.
-2. **Holder** retrieves encrypted VC and stores it in their wallet.
+### Story 1 — Credential Issuance
+1. Holder (student) requests a credential from Issuer (university).
+2. Holder retrieves encrypted VC and stores it in their wallet.
 
-### **Story 2 — Proof and Verification**
-1. **Holder** generates a ZK proof locally using the Polygon ID SDK.
-2. **Holder** encodes the proof in a QR code and shares it with **Verifier**.
-3. **Verifier** scans the QR, verifies proof off-chain using Polygon ID SDK,
+### Story 2 — Proof and Verification
+1. Holder generates a ZK proof locally using the Polygon ID SDK.
+2. Holder encodes the proof in a QR code and shares it with Verifier.
+3. Verifier scans the QR, verifies proof off-chain using Polygon ID SDK,
    and checks on-chain credential status.
-4. **Verifier** displays validation result (Valid / Revoked / Expired).
+4. Verifier displays validation result (Valid / Revoked / Expired).
 
 
 
-## **3. Smart Contracts**
+## 3. Smart Contracts
 
-### **IssuerRegistry.sol**
+### IssuerRegistry.sol
 Registers and manages trusted issuers.
 
 ```solidity
@@ -106,7 +106,7 @@ contract IssuerRegistry {
 
 
 
-### **CredentialRegistry.sol**
+### CredentialRegistry.sol
 Anchors credential hashes and supports revocation.
 
 ```solidity
@@ -130,19 +130,19 @@ contract CredentialRegistry {
 
 
 
-## **4. Backend (API Gateway)**
+## 4. Backend (API Gateway)
 
-### **4.1 API Summary**
+### 4.1 API Summary
 
 | Method | Endpoint                           | Description                                                                                                                                                    |
 | ------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/api/issuer/request-credential`   | **Synchronous issuance**: Holder requests; server calls issuer APIs, builds & signs VC, encrypts+stores to IPFS, anchors on-chain, and returns credential info |
+| `POST` | `/api/issuer/request-credential`   | Synchronous issuance: Holder requests; server calls issuer APIs, builds & signs VC, encrypts+stores to IPFS, anchors on-chain, and returns credential info |
 | `GET`  | `/api/holder/credential/:credHash` | Re-fetch encrypted VC (inline or pre-signed URL) for local decryption by Holder                                                                                |
 | `GET`  | `/api/credential/status/:credHash` | Public status lookup from chain (Active / Revoked)                                                                                                             |
-| `POST` | `/api/verifier/verify-proof`       | *(Optional)* Centralized verification: server validates ZK proof off‑chain + checks chain & issuer allowlist; **clients SHOULD verify locally**.               |
+| `POST` | `/api/verifier/verify-proof`       | *(Optional)* Centralized verification: server validates ZK proof off‑chain + checks chain & issuer allowlist; clients SHOULD verify locally.               |
 Notes:
-- Issuer‑provided APIs (university data endpoints) are **external** to this gateway and must be configured per issuer (base URL, auth, mappings).
-- Verifier clients **SHOULD** verify proofs **locally** (client‑side) using Polygon ID SDK; a server‑side verification API is **retained** as an optional/centralized policy path.
+- Issuer‑provided APIs (university data endpoints) are external to this gateway and must be configured per issuer (base URL, auth, mappings).
+- Verifier clients SHOULD verify proofs locally (client‑side) using Polygon ID SDK; a server‑side verification API is retained as an optional/centralized policy path.
 ### 4.2 Sequence Diagram
 
 ```mermaid
@@ -177,8 +177,8 @@ GET https://issuer.example.edu/api/v1/students/{studentId}/degree
 Authorization: Bearer <issuer_service_token>
 ```
 ### 4.5 Verification Model
-- **Primary path:** Verifier apps **verify locally** with Polygon ID SDK (no server round‑trip required).
-- **Server path (optional):** `/api/verifier/verify-proof` gives a centralized, policy‑enforced verdict and can offload chain RPCs and issuer‑registry checks.
+- Primary path: Verifier apps verify locally with Polygon ID SDK (no server round‑trip required).
+- Server path (optional): `/api/verifier/verify-proof` gives a centralized, policy‑enforced verdict and can offload chain RPCs and issuer‑registry checks.
 ### 4.7 RESTful API Details
 #### `POST /api/issuer/request-credential`
 The API gateway:
@@ -190,14 +190,14 @@ The API gateway:
 6) computes `credHash` and anchors it on-chain;
 7) returns consolidated credential metadata to the Holder.
 
-**Headers**
+Headers
 ```
 Authorization: Bearer <holder_token>
 X-DID: did:polygonid:...Holder...
 Content-Type: application/json
 ```
 
-**Request**
+Request
 ```json
 {
   "holderDid": "did:polygonid:polygon:amoy:0xStu456...",
@@ -207,7 +207,7 @@ Content-Type: application/json
 }
 ```
 
-**Response (200 OK)**
+Response (200 OK)
 ```json
 {
   "status": "issued",
@@ -220,22 +220,22 @@ Content-Type: application/json
 }
 ```
 
-**Errors**
+Errors
 - `400` invalid DID / malformed request
 - `401/403` auth or DID mismatch
 - `424` failed to fetch issuer data (issuer APIs unavailable or returned non-authoritative data)
 - `502/504` upstream/chain timeouts; client may retry
 
 #### `GET /api/holder/credential/:credHash`
-**Purpose**: Allow the Holder to re-fetch the encrypted VC payload/URL for local decryption.
+Purpose: Allow the Holder to re-fetch the encrypted VC payload/URL for local decryption.
 
-**Headers**
+Headers
 ```
 Authorization: Bearer <holder_token>
 X-DID: did:polygonid:...Holder...
 ```
 
-**Response (200 OK)**
+Response (200 OK)
 ```json
 {
   "credHash": "0xabc123...",
@@ -246,30 +246,30 @@ X-DID: did:polygonid:...Holder...
 }
 ```
 
-**Errors**
+Errors
 - `404` unknown `credHash` for this holder
 - `403` holder DID mismatch
 
 #### `GET /api/credential/status/:credHash`
-**Purpose**: Public, read-only pass-through to chain for the credential status.
+Purpose: Public, read-only pass-through to chain for the credential status.
 
-**Response**
+Response
 ```json
 { "status": "Active" }
 ```
 
 #### `POST /api/verifier/verify-proof` *(Optional — server-side verification retained)*
 
-Verifier clients **SHOULD** verify ZK proofs locally with Polygon ID SDK. This endpoint is retained for more complex access control in the future.
+Verifier clients SHOULD verify ZK proofs locally with Polygon ID SDK. This endpoint is retained for more complex access control in the future.
 
-**Headers**
+Headers
 ```
 Authorization: Bearer <verifier_token or public>
 X-DID: did:web:company.com   // Used for more complex access control in the future.
 Content-Type: application/json
 ```
 
-**Request**
+Request
 ```json
 {
   "proof": "<base64 zk proof>",
@@ -279,13 +279,13 @@ Content-Type: application/json
 }
 ```
 
-**Server processing**
+Server processing
 1) Validate ZK proof (off-chain) using Polygon ID verifier SDK.
 2) Ensure `issuerDid` is active in IssuerRegistry (on-chain).
 3) Ensure `statusOf(credHash)` is `Active` (on-chain).
 4) Apply optional policy (e.g., allowed schemas, expiry, nonce binding).
 
-**Response**
+Response
 ```json
 {
   "verified": true,
@@ -295,25 +295,25 @@ Content-Type: application/json
 }
 ```
 
-## **5. Client Implementation**
+## 5. Client Implementation
 
 Client can be built upon [ether.js](https://docs.ethers.org/v5/).
-### **5.1 Holder Client
+### 5.1 Holder Client
 - Functions:
   1. Manage DID & keys
   2. Store credentials securely
   3. Generate ZK proofs using SDK
   4. Encode proof in QR for Verifier
 
-### **5.2 Verifier Client
+### 5.2 Verifier Client
 - Flow:
   1. Scan QR to retrieve proof JSON
   2. Validate proof locally
   3. Check on-chain status
 
-## **6. ZK Proof Generation and Verification**
+## 6. ZK Proof Generation and Verification
 
-### **6.1 Proof Generation (Holder)**
+### 6.1 Proof Generation (Holder)
 
 1. Select VC in wallet
 2. Parse Verifier's proof request
@@ -329,7 +329,7 @@ Client can be built upon [ether.js](https://docs.ethers.org/v5/).
 }
 ```
 
-### **6.2 Proof Verification (Verifier)**
+### 6.2 Proof Verification (Verifier)
 
 1. Receive proof JSON via QR or link
 2. Use SDK to verify
