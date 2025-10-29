@@ -140,6 +140,7 @@ contract CredentialRegistry {
 | `GET`  | `/api/holder/credential/:credHash` | Re-fetch encrypted VC (inline or pre-signed URL) for local decryption by Holder                                                                                |
 | `GET`  | `/api/credential/status/:credHash` | Public status lookup from chain (Active / Revoked)                                                                                                             |
 | `POST` | `/api/verifier/verify-proof`       | *(Optional)* Centralized verification: server validates ZK proof off‑chain + checks chain & issuer allowlist; clients SHOULD verify locally.               |
+
 Notes:
 - Issuer‑provided APIs (university data endpoints) are external to this gateway and must be configured per issuer (base URL, auth, mappings).
 - Verifier clients SHOULD verify proofs locally (client‑side) using Polygon ID SDK; a server‑side verification API is retained as an optional/centralized policy path.
