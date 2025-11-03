@@ -1,338 +1,316 @@
-# Zero-Knowledge Credential Verification System on Polygon
+# Privado ID–based Degree Certificate System
+**Design & Implementation Spec (GitHub‑ready sequence diagrams)**
 
-## 1. Concepts
+> **Scope**
+> - Backend == the university (no third party).
+> - Reuse **Privado ID Wallet** (Holder) + **Issuer Node**.
+> - Issuance: **On‑chain Merklized Issuer**. See [Privado ID on‑chain issuer](https://docs.privado.id/docs/issuer/on-chain-issuer/on-chain-overview)
+> - Verification: **Off‑chain** with Verifier SDK. See [Privado ID off‑chain verification](https://docs.privado.id/docs/verifier/verification-library/verifier-library-intro)
+> - **Iden3comm‑compatible** Auth/Verify APIs (QR payloads + callbacks).
+> - Student identity auth = **standard Privado ID Auth** + **simple username/password** (first‑time binding).
 
-### 1.1 Decentralized Identifiers (DIDs)
-A Decentralized Identifier (DID) uniquely represents an entity (Issuer, Holder, or Verifier).
-Each DID corresponds to a DID Document containing public keys and endpoints for authentication and proof verification.
+---
 
-Example:
-```json
-{
-  "id": "did:polygonid:polygon:amoy:0xabc123...",
-  "verificationMethod": [{
-    "id": "did:polygonid:polygon:amoy:0xabc123#keys-1",
-    "type": "EcdsaSecp256k1VerificationKey2019",
-    "controller": "did:polygonid:polygon:amoy:0xabc123...",
-    "publicKeyHex": "03d1aef9..."
-  }]
-}
+## 0. Technical Background
+- Decentralized ID (**DID**) proves control via cryptographic Auth proof; a Verifiable Credential (**VC**) is a signed JSON held locally by the wallet.
+- **Issuer Node** merklizes claims and updates on‑chain **state roots**; no VC plaintext on chain.
+- **Iden3comm** defines the **standard** message shapes for Auth/Offer/Proof (QR + callback).
+- **Off‑chain verification** uses Verifier SDK and reads the latest state from the chain via RPC.
+
+**Privado ID** provides the platform for DID, issuing VC, holding (wallet) and verification. We only add our business logic on top.
+
+Developers should at least understand:
+- [Background knowledge](./background-knowledge.md)
+- [Privado ID on‑chain issuer](https://docs.privado.id/docs/issuer/on-chain-issuer/on-chain-overview)
+- [Privado ID off‑chain verification](https://docs.privado.id/docs/verifier/verification-library/verifier-library-intro)
+
+---
+
+## 1. Actors & Responsibilities
+
+| Role | Responsibilities |
+|------|------------------|
+| **Holder (Privado Wallet)** | Scan QR; perform DID Auth; store VC locally; generate ZK proofs. |
+| **Backend (University)** | Auth (DID + first‑time username/password); Issue (call Issuer Node; Offer QR); Verify (proof request + off‑chain validation). |
+| **Issuer Node** | Merklized issuance; publish state roots to chain; return VC + MTP. |
+| **Blockchain** | Stores state roots (claims/revocation/root‑of‑roots). |
+
+---
+
+## 2. Deployment & Configuration
+
+### 2.1 Backend Environment
+```env
+NETWORK=amoy
+RPC_URL=https://rpc-amoy.polygon.technology
+STATE_CONTRACT=0x134B1BE34911E39A8397EC6289782989729807a4
+
+ISSUER_NODE_BASE=https://issuer.school.edu
+ISSUER_DID=did:polygonid:polygon:amoy:0xYourIssuerIdentity
+
+BACKEND_BASE=https://school.edu
+SESSION_TTL_MIN=15
+VERIFY_SESSION_TTL_MIN=10
 ```
 
-- Issuer DID → The university (trusted credential issuer).
-- Holder DID → The student’s identity, managed in a Polygon ID wallet.
-- Verifier DID → (Optional) The organization verifying the credential.
+### 2.2 Issuer DID
+- Generate/import the **Issuer DID** (school identity).
+- Configure Issuer Node to sign as that DID.
+- Share Issuer DID so verifiers can set `allowedIssuers`.
 
+### 2.3 Schema
+- Host `DegreeCredential` schema (IPFS/HTTPS). Wallets and Issuer Node reference this in issuance and proof queries.
 
+### 2.4 Verifier SDK
+- Initialize a **StateResolver** with `(RPC_URL, STATE_CONTRACT)`; support multi‑network if needed.
 
-### 1.2 Verifiable Credentials (VCs)
-A VC is a signed digital credential issued by an Issuer to a Holder’s DID.
-It includes claims, such as degree type and graduation date, and the Issuer’s cryptographic signature (VC proof).
+---
 
-```json
-{
-  "@context": ["https://www.w3.org/2018/credentials/v1"],
-  "type": ["VerifiableCredential", "DegreeCredential"],
-  "issuer": "did:polygonid:polygon:amoy:0xUni123...",
-  "issuanceDate": "2025-06-30T00:00:00Z",
-  "credentialSubject": {
-    "id": "did:polygonid:polygon:amoy:0xStu456...",
-    "degree": "Master",
-    "field": "Computer Science"
-  },
-  "proof": {
-    "type": "EcdsaSecp256k1Signature2019",
-    "created": "2025-06-30T00:00:00Z",
-    "proofPurpose": "assertionMethod",
-    "verificationMethod": "did:polygonid:polygon:amoy:0xUni123#keys-1",
-    "jws": "eyJhbGciOiJFUzI1NiIs..."
-  }
-}
-```
+## 3. End‑to‑End User Stories
 
-Note: The `proof` field is the Issuer’s digital signature, proving authenticity. It is not the Holder’s ZK proof.
+### Story A — Student receives a degree credential
+1) Student opens **Auth** page, scans QR; wallet performs **DID Auth** → callback.
+2) First time only, backend shows **username/password** form; binds `{studentId ↔ DID}`.
+3) Admin triggers **Issue**: backend calls Issuer Node with `subjectId=DID` → gets VC + MTP → renders **Offer** QR.
+4) Wallet retrieves VC and stores locally (encrypted).
 
-### 1.3 Zero-Knowledge Proofs (ZKPs)
-Later, the Holder generates a ZK proof derived from the VC.
-This allows proving statements like *“I have a degree from a valid Issuer”* without revealing personal data.
+### Story B — Third‑party verification (off‑chain)
+1) Verifier page creates a **verification session** → shows **Proof Request** QR.
+2) Wallet posts **proofs/response** to callback.
+3) Backend uses Verifier SDK; checks state roots → shows result (Valid/Revoked/Expired).
 
-### 1.4 On-Chain Anchoring
-To keep data private:
-- Only hashes and statuses are stored on-chain:
-  - `credHash = keccak256(vcCanonicalForm)`
-  - `issuerDidHash`
-  - `schemaHash`
-  - status (`Active` / `Revoked`)
-- The encrypted VC itself is stored in IPFS (AES-GCM encrypted with the Holder’s public key).
+---
 
-This design ensures public verifiability without leaking sensitive data.
+For the standard part, the [official demo codebase](https://github.com/0xPolygonID/onchain-merklized-issuer-demo) can be referred to.
+## 4. Authentication Flow (DID + first‑time username/password)
 
-## 2. End-to-End User Stories
+> **STANDARD parts**: Iden3comm **authorization/1.0/request → response**, wallet callback, and off‑chain verify of Auth proof.
 
-### Story 1 — Credential Issuance
-1. Holder (student) requests a credential from Issuer (university).
-2. Holder retrieves encrypted VC and stores it in their wallet.
-
-### Story 2 — Proof and Verification
-1. Holder generates a ZK proof locally using the Polygon ID SDK.
-2. Holder encodes the proof in a QR code and shares it with Verifier.
-3. Verifier scans the QR, verifies proof off-chain using Polygon ID SDK,
-   and checks on-chain credential status.
-4. Verifier displays validation result (Valid / Revoked / Expired).
-
-
-
-## 3. Smart Contracts
-
-### IssuerRegistry.sol
-Registers and manages trusted issuers.
-
-```solidity
-contract IssuerRegistry {
-    struct Issuer {
-        bytes32 didHash;
-        address controller;
-        string metadataURI;
-        bool active;
-    }
-
-    mapping(bytes32 => Issuer) public issuers;
-
-    function registerIssuer(bytes32 didHash, address controller, string calldata metadataURI) external;
-    function updateIssuer(bytes32 didHash, address controller, string calldata metadataURI, bool active) external;
-    function isActive(bytes32 didHash) external view returns (bool);
-}
-```
-
-
-
-### CredentialRegistry.sol
-Anchors credential hashes and supports revocation.
-
-```solidity
-contract CredentialRegistry {
-    enum Status { None, Active, Revoked }
-
-    struct Credential {
-        bytes32 credHash;
-        bytes32 issuerDidHash;
-        bytes32 schemaHash;
-        Status status;
-    }
-
-    mapping(bytes32 => Credential) public credentials;
-
-    function anchor(bytes32 credHash, bytes32 issuerDidHash, bytes32 schemaHash) external;
-    function revoke(bytes32 credHash) external;
-    function statusOf(bytes32 credHash) external view returns (Status);
-}
-```
-
-
-
-## 4. Backend (API Gateway)
-
-### 4.1 API Summary
-
-| Method | Endpoint                           | Description                                                                                                                                                    |
-| ------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/api/issuer/request-credential`   | Synchronous issuance: Holder requests; server calls issuer APIs, builds & signs VC, encrypts+stores to IPFS, anchors on-chain, and returns credential info |
-| `GET`  | `/api/holder/credential/:credHash` | Re-fetch encrypted VC (inline or pre-signed URL) for local decryption by Holder                                                                                |
-| `GET`  | `/api/credential/status/:credHash` | Public status lookup from chain (Active / Revoked)                                                                                                             |
-| `POST` | `/api/verifier/verify-proof`       | *(Optional)* Centralized verification: server validates ZK proof off‑chain + checks chain & issuer allowlist; clients SHOULD verify locally.               |
-
-Notes:
-- Issuer‑provided APIs (university data endpoints) are external to this gateway and must be configured per issuer (base URL, auth, mappings).
-- Verifier clients SHOULD verify proofs locally (client‑side) using Polygon ID SDK; a server‑side verification API is retained as an optional/centralized policy path.
-### 4.2 Sequence Diagram
+### 4.1 Sequence (GitHub‑friendly)
 
 ```mermaid
 sequenceDiagram
-    participant H as Holder (Student)
-    participant API as API Gateway (Backend)
-    participant I as Issuer (University)
-    participant IPFS as IPFS (Encrypted Storage)
-    participant SC as Polygon (Smart Contracts)
+participant UI as Backend UI (QR)
+participant W as Privado Wallet
+participant B as Backend
+participant DB as Univ DB
 
-    H->>API: POST /api/issuer/request-credential (Holder DID, degree info)
-    API->>I: GET issuer-provided APIs for credentials
-   I-->>API: Return credentials
-    API->>API: Generate & sign VC JSON (Holder DID, credential data)
-    API->>IPFS: Upload encrypted VC (AES-GCM with Holder’s public key)
-    IPFS-->>API: Return IPFS CID
-    API->>SC: CredentialRegistry.anchor(credHash, issuerDidHash, schemaHash)
-    SC-->>API: Tx success (status: Active)
-    API-->>H: Return credential information (on-chain & off-chain)
+rect rgb(224,240,255)
+UI->>B: GET /auth/start
+B-->>UI: Return QR (iden3comm://?request_uri=/auth/request/:sid)
+W->>B: GET /auth/request/:sid
+B-->>W: authorization/1.0/request { callbackUrl, message(nonce), scope: [] }
+W->>B: POST /auth/callback?sid=... (authorization/1.0/response + Auth proof)
+B->>B: VerifierSDK.fullVerify(response, originalRequest)
+Note right of B: DID extracted & session marked DID-verified
+end
+
+alt First-time binding
+  B-->>UI: Prompt username/password
+  UI->>B: POST /auth/sso { username, password, did }
+  B->>DB: Validate credentials
+  DB-->>B: OK
+  B->>DB: Bind DID ↔ studentId
+  B-->>UI: Bound
+else Already bound
+  B-->>UI: Auth complete
+end
 ```
 
-### 4.3 Auth & Caller Identity
-- Transport: HTTPS only
-- Authorization & Identification: Each request should be authenticated by DID.
-### 4.4 Issuer-Provided APIs (External Connectors)
-- Each Issuer must expose read-only endpoints for authoritative degree data (e.g., by `studentId`).
-- The API Gateway maintains per‑issuer connector configs (base URL, auth, field mappings).
+### 4.2 APIs (Auth)
+- `GET /auth/start` → `{ sessionId, request_uri, qr }` where `request_uri` targets `/auth/request/:sessionId` (QR payload).
+- `GET /auth/request/:sessionId` → **authorization/1.0/request** JSON `{ callbackUrl, message(nonce), scope:[] }` (**STANDARD**).
+- `POST /auth/callback?sessionId=...` ← wallet **authorization/1.0/response** (**STANDARD**); backend calls `VerifierSDK.fullVerify(...)`.
+- `POST /auth/sso` → `{ username, password, did }` bind first‑time only.
+- `GET /auth/status?sessionId=...` → `{ didVerified, studentBound }`.
 
-Example (conceptual, out of scope of this gateway spec):
-```
-GET https://issuer.example.edu/api/v1/students/{studentId}/degree
-Authorization: Bearer <issuer_service_token>
-```
-### 4.5 Verification Model
-- Primary path: Verifier apps verify locally with Polygon ID SDK (no server round‑trip required).
-- Server path (optional): `/api/verifier/verify-proof` gives a centralized, policy‑enforced verdict and can offload chain RPCs and issuer‑registry checks.
-### 4.7 RESTful API Details
-#### `POST /api/issuer/request-credential`
-The API gateway:
-1) resolves Holder public key from DID;
-2) calls issuer-provided APIs to fetch authoritative degree data;
-3) builds VC JSON;
-4) signs with Issuer’s private key;
-5) encrypts VC with Holder’s public key and uploads to IPFS;
-6) computes `credHash` and anchors it on-chain;
-7) returns consolidated credential metadata to the Holder.
+### 4.3 How issuing receives “auth context”
+- Backend session keeps `{ did, didVerified:true, verifiedAt, studentId? }` after Auth callback.
+- Issuing endpoint receives a `sessionId` from UI; backend **resolves** it to the DID and includes it as `subjectId` in the Issuer Node `/v1/credentials/issue` call.
+- The session id itself can be recorded as `authContextId` in the issuance audit row to link “who was authenticated” when issuing occurred.
 
-Headers
+---
+
+## 5. Issuing Flow (On‑chain Merklized)
+
+> **STANDARD parts**: Issuer Node merklized flow and on‑chain state update; wallet Offer consumption.
+
+### 5.1 Sequence (GitHub‑friendly)
+
+```mermaid
+sequenceDiagram
+participant UI as Admin UI
+participant B as Backend
+participant IN as Issuer Node
+participant C as Chain (State Contract)
+participant W as Wallet
+
+UI->>B: POST /issue/credentials { sessionId }
+B->>B: Resolve DID from session (must be DID‑verified)
+B->>IN: /v1/credentials/issue { schema, subjectId=DID, type, credentialSubject }
+rect rgb(224,240,255)
+IN->>C: addClaimHashAndTransit (publish new state roots)
+C-->>IN: State updated
+IN-->>B: VC + Merkle Proof (MTP)
+end
+B->>B: Create credentials/1.0/offer { url, credentials[] }
+B-->>UI: Show Offer QR
+W->>B: Scan Offer QR → GET offer URL
+B-->>W: Redirect / serve Issuer Node agent URL
+W->>IN: GET /agent/credentials/{id}
+IN-->>W: VC JSON (+ MTP)
+W->>W: Store VC locally
 ```
-Authorization: Bearer <holder_token>
-X-DID: did:polygonid:...Holder...
+
+### 5.2 Issuer Node request (example)
+```http
+POST {ISSUER_NODE_BASE}/v1/credentials/issue
 Content-Type: application/json
+
+{
+  "schema": "ipfs://QmSchemaHash",
+  "subjectId": "did:polygonid:holder...",
+  "type": ["VerifiableCredential", "DegreeCredential"],
+  "credentialSubject": {
+    "university": "ABC University",
+    "degree": "BSc",
+    "major": "Computer Science",
+    "graduationYear": 2025
+  },
+  "expiration": "2027-12-31T23:59:59Z",
+  "revocationNonce": 1234567
+}
 ```
 
-Request
+### 5.3 Offer (QR payload)
 ```json
 {
-  "holderDid": "did:polygonid:polygon:amoy:0xStu456...",
-  "degreeQuery": {
-    "studentId": "2025CS123456"
+  "type": "https://iden3-communication.io/credentials/1.0/offer",
+  "body": {
+    "url": "https://issuer.school.edu/api/credentials/abcd-1234",
+    "credentials": [
+      { "type": ["VerifiableCredential", "DegreeCredential"], "schema": "ipfs://QmSchemaHash" }
+    ]
   }
 }
 ```
 
-Response (200 OK)
+---
+
+## 6. Verification Flow (Off‑chain)
+
+> **STANDARD parts**: Iden3comm Proof Request/Response and off‑chain `VerifierSDK.fullVerify(...)` + state resolver.
+
+### 6.1 Sequence (GitHub‑friendly)
+
+```mermaid
+sequenceDiagram
+participant VUI as Verifier UI
+participant B as Backend
+participant W as Wallet
+participant VS as Verifier SDK
+participant C as Chain (read RPC)
+
+VUI->>B: POST /verify/sessions { policy }
+B-->>VUI: Return QR (iden3comm://?request_uri=/verify/request/:vid)
+
+W->>B: GET /verify/request/:vid
+B-->>W: proofs/1.0/request { callbackUrl, reason, scope[query...] }
+
+W->>B: POST /verify/callback?verifyId=vid (proofs/1.0/response)
+B->>VS: fullVerify(proofResponse, proofRequest)
+VS->>C: Read latest state roots
+C-->>VS: Roots
+VS-->>B: { verified: true/false, reason }
+
+B-->>VUI: Show result (Valid/Revoked/Expired/NotMatch)
+```
+
+### 6.2 Proof Request (QR payload)
 ```json
 {
-  "status": "issued",
-  "credHash": "0xabc123...",
-  "ipfsCid": "bafybeigdyr42p...",
-  "issuerDid": "did:polygonid:polygon:amoy:0xUni123...",
-  "anchoredAtTx": "0xTXHASH...",
-  "issuedAt": "2025-10-29T09:00:00Z",
-  "schemaHash": "0x123abc..."
+  "type": "https://iden3-communication.io/proofs/1.0/request",
+  "body": {
+    "callbackUrl": "https://school.edu/verify/callback?verifyId=uuid",
+    "reason": "Verify degree authenticity",
+    "scope": [{
+      "query": {
+        "allowedIssuers": ["did:polygonid:issuer123"],
+        "type": "DegreeCredential",
+        "credentialSubject": {
+          "university": { "$eq": "ABC University" }
+        }
+      }
+    }]
+  }
 }
 ```
 
-Errors
-- `400` invalid DID / malformed request
-- `401/403` auth or DID mismatch
-- `424` failed to fetch issuer data (issuer APIs unavailable or returned non-authoritative data)
-- `502/504` upstream/chain timeouts; client may retry
-
-#### `GET /api/holder/credential/:credHash`
-Purpose: Allow the Holder to re-fetch the encrypted VC payload/URL for local decryption.
-
-Headers
-```
-Authorization: Bearer <holder_token>
-X-DID: did:polygonid:...Holder...
-```
-
-Response (200 OK)
+### 6.3 Wallet Callback (STANDARD)
 ```json
 {
-  "credHash": "0xabc123...",
-  "ipfsCid": "bafybeigdyr42p...",
-  "encryptedVc": "<optional-inline-blob-or-pre-signed-url>",
-  "issuerDid": "did:polygonid:polygon:amoy:0xUni123...",
-  "schemaHash": "0x123abc..."
+  "proof": {
+    "type": "zkProofV2",
+    "pub_signals": ["..."],
+    "proof": { "pi_a":[], "pi_b":[], "pi_c":[] }
+  },
+  "did": "did:polygonid:..."
 }
 ```
-
-Errors
-- `404` unknown `credHash` for this holder
-- `403` holder DID mismatch
-
-#### `GET /api/credential/status/:credHash`
-Purpose: Public, read-only pass-through to chain for the credential status.
-
-Response
-```json
-{ "status": "Active" }
+Server:
+```js
+const result = await verifier.fullVerify(proofResponse, proofRequest);
 ```
 
-#### `POST /api/verifier/verify-proof` *(Optional — server-side verification retained)*
+---
 
-Verifier clients SHOULD verify ZK proofs locally with Polygon ID SDK. This endpoint is retained for more complex access control in the future.
+## 7. API Surface
 
-Headers
-```
-Authorization: Bearer <verifier_token or public>
-X-DID: did:web:company.com   // Used for more complex access control in the future.
-Content-Type: application/json
-```
+### 7.1 Auth
+- `GET /auth/start` → `{ sessionId, request_uri, qr }`
+- `GET /auth/request/:sessionId` → **authorization/1.0/request**
+- `POST /auth/callback?sessionId=...` ← **authorization/1.0/response**
+- `POST /auth/sso` → `{ username, password, did }` (bind first‑time)
+- `GET /auth/status?sessionId=...` → `{ didVerified, studentBound }`
 
-Request
-```json
-{
-  "proof": "<base64 zk proof>",
-  "credHash": "0xabc123...",
-  "issuerDid": "did:polygonid:polygon:amoy:0xUni123...",
-  "verifierDid": "did:web:company.com"
-}
-```
+### 7.2 Issue
+- `POST /issue/prepare` → lookup by `studentId`
+- `POST /issue/credentials` → uses **subjectId = DID** from session; returns `{ claimId, txHash, stateRoot }`
+- `GET /issue/offer?claimId=...&subjectDID=...` → **credentials/1.0/offer**
 
-Server processing
-1) Validate ZK proof (off-chain) using Polygon ID verifier SDK.
-2) Ensure `issuerDid` is active in IssuerRegistry (on-chain).
-3) Ensure `statusOf(credHash)` is `Active` (on-chain).
-4) Apply optional policy (e.g., allowed schemas, expiry, nonce binding).
+### 7.3 Verify (Off‑chain)
+- `POST /verify/sessions` → returns `{ verifyId, request_uri, qr }`
+- `GET /verify/request/:verifyId` → **proofs/1.0/request**
+- `POST /verify/callback?verifyId=...` ← **proofs/1.0/response**
+- `GET /verify/status/:verifyId` → `{ status, result, checkedAt }`
 
-Response
-```json
-{
-  "verified": true,
-  "issuer": "did:polygonid:polygon:amoy:0xUni123...",
-  "status": "Active",
-  "checkedAt": "2025-10-29T09:05:00Z"
-}
-```
+---
 
-## 5. Client Implementation
+## 8. Data Model & Storage
 
-Client can be built upon [ether.js](https://docs.ethers.org/v5/).
-### 5.1 Holder Client
-- Functions:
-  1. Manage DID & keys
-  2. Store credentials securely
-  3. Generate ZK proofs using SDK
-  4. Encode proof in QR for Verifier
+| Table | Key Fields | Notes |
+|------|------------|-------|
+| **users** | studentId (PK), name, email | University directory |
+| **did_bindings** | id (PK), studentId (FK), did (unique), status, bound_at | First‑time binding only |
+| **sessions** | sid (PK), did, didVerified, studentId?, createdAt, expiresAt | For Auth & Issue |
+| **issue_records** | claimId, did, schema, revNonce, stateRoot, txHash, createdAt | Issuance audit |
+| **verify_sessions** | verifyId, policy, status, proof?, result?, createdAt, expiresAt | Off‑chain verify |
 
-### 5.2 Verifier Client
-- Flow:
-  1. Scan QR to retrieve proof JSON
-  2. Validate proof locally
-  3. Check on-chain status
+**Data residency:** VC plaintext remains in the **wallet only**. Backend stores minimal metadata and proofs transiently.
 
-## 6. ZK Proof Generation and Verification
+---
 
-### 6.1 Proof Generation (Holder)
+## 9. Security & Ops
 
-1. Select VC in wallet
-2. Parse Verifier's proof request
-3. Locally compute ZK proof
-4. Encode proof JSON:
-```json
-{
-  "proof": "<base64 zk proof>",
-  "issuerDid": "did:polygonid:polygon:amoy:0xUni123...",
-  "credHash": "0xabc...",
-  "schemaHash": "0xdef...",
-  "timestamp": 1730200000
-}
-```
+- Nonce binding, session TTLs, short‑lived verification sessions.
+- Whitelist **Issuer DID** on verifier queries.
+- Always read **latest state roots** before judging a proof.
+- No VC plaintext on backend or chain.
+- Audit with IDs/hashes only; avoid PII in logs.
 
-### 6.2 Proof Verification (Verifier)
+---
 
-1. Receive proof JSON via QR or link
-2. Use SDK to verify
-3. Validate Issuer and on-chain credential status
-4. Return result
+## 10. STANDARD vs Custom (at a glance)
+
+**STANDARD**: Iden3comm message shapes (Auth/Offer/Proof), wallet callbacks, Issuer Node merklized issuance + state update, Verifier SDK `fullVerify(...)`.
+**Custom**: First‑time username/password binding, UI, orchestration, and minimal persistence.
