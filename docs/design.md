@@ -1,5 +1,5 @@
 # Privado ID–based Degree Certificate System
-**Design & Implementation Spec (GitHub‑ready sequence diagrams)**
+**Design & Implementation Spec**
 
 > **Scope**
 > - Backend == the university (no third party).
@@ -40,6 +40,8 @@ Developers should at least understand:
 ## 2. Deployment & Configuration
 
 ### 2.1 Backend Environment
+
+Example:
 ```env
 NETWORK=amoy
 RPC_URL=https://rpc-amoy.polygon.technology
@@ -81,12 +83,15 @@ VERIFY_SESSION_TTL_MIN=10
 
 ---
 
-For the standard part, the [official demo codebase](https://github.com/0xPolygonID/onchain-merklized-issuer-demo) can be referred to.
+Note:
+- For the standard part, the [official demo codebase](https://github.com/0xPolygonID/onchain-merklized-issuer-demo) can be referred to.
+- The standard parts are marked with a special color in the sequence graph.
+
 ## 4. Authentication Flow (DID + first‑time username/password)
 
 > **STANDARD parts**: Iden3comm **authorization/1.0/request → response**, wallet callback, and off‑chain verify of Auth proof.
 
-### 4.1 Sequence (GitHub‑friendly)
+### 4.1 Sequence Graph
 
 ```mermaid
 sequenceDiagram
@@ -135,7 +140,7 @@ end
 
 > **STANDARD parts**: Issuer Node merklized flow and on‑chain state update; wallet Offer consumption.
 
-### 5.1 Sequence (GitHub‑friendly)
+### 5.1 Sequence Graph
 
 ```mermaid
 sequenceDiagram
@@ -201,7 +206,7 @@ Content-Type: application/json
 
 > **STANDARD parts**: Iden3comm Proof Request/Response and off‑chain `VerifierSDK.fullVerify(...)` + state resolver.
 
-### 6.1 Sequence (GitHub‑friendly)
+### 6.1 Sequence Graph
 
 ```mermaid
 sequenceDiagram
