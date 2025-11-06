@@ -1,0 +1,40 @@
+{
+  "name": "unicredify",
+  "version": "0.1.0",
+  "description": "Decentralized Identity and Access Management for University Credentials and Verification using Blockchain Technology",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npm run dev --workspace=backend & npm run dev --workspace=frontend",
+    "build": "npm run build --workspaces",
+    "test:contracts": "npm run test --workspace=contracts",
+    "test:backend": "npm run test --workspace=backend",
+    "deploy:contracts": "npm run deploy --workspace=contracts",
+    "lint": "npm run lint --workspaces",
+    "format": "prettier --write \"**/*.{js,ts,tsx,json,md}\""
+  },
+  "workspaces": [
+    "contracts",
+    "backend",
+    "frontend"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ak-asu/ProjectIAM.git"
+  },
+  "keywords": [
+    "blockchain",
+    "identity",
+    "verifiable",
+    "credentials",
+    "university"
+  ],
+  "author": "Group 17",
+  "license": "MIT",
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  },
+  "engines": {
+    "node": ">=22.20.0",
+    "npm": ">=11.1.0"
+  }
+}
