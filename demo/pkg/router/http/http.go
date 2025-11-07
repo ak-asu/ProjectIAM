@@ -46,6 +46,7 @@ func (h *Handlers) NewRouter(opts ...Option) http.Handler {
 	h.authRouters(r)
 	h.agentRouters(r)
 	h.apiRouters(r)
+	h.schemaRouters(r)
 
 	return r
 }
@@ -79,4 +80,10 @@ func (h Handlers) apiRouters(r *chi.Mux) {
 			r.Post("/claims/revoke/{nonce}", h.issuerHandler.RevokeClaim)
 		})
 	})
+}
+
+func (h Handlers) schemaRouters(r *chi.Mux) {
+	// Serve schema files from /schemas directory
+	fileServer := http.FileServer(http.Dir("./schemas"))
+	r.Handle("/schemas/*", http.StripPrefix("/schemas", fileServer))
 }

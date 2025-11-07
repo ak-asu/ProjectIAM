@@ -59,14 +59,14 @@ func (a *AuthenticationService) Verify(ctx context.Context,
 		// DEMO MODE: Skip all verification and accept any authentication
 		// In demo mode, we don't verify the token at all - just accept it
 		// Generate a demo DID for this session using a valid base58-encoded identifier
-		// We use a pool of pre-generated valid DIDs to avoid parsing errors
-		// These DIDs correspond to dummy contract addresses (0x0000...0001, 0x0000...0002, etc.)
+		// We use a pool of pre-generated valid DIDs generated from dummy addresses
+		// These DIDs correspond to contract addresses (0x0000...0001, 0x0000...0002, etc.)
 		validDemoDIDs := []string{
 			"did:iden3:privado:test:2Skqvp4vnSFtq5bgAXbDs1Fs4AA5QGpRut9mCDfGdm", // From address 0x0000...0001
-			"did:iden3:privado:test:2Skqvp4vnSFtruWKUaJKH5BNZfkXMi3VXh81QW4uG3", // From address 0x0000...0002
-			"did:iden3:privado:test:2Skqvp4vnSFu3xHdP5R9hRpJcZt7LePaCy5fQuZQby", // From address 0x0000...0003
-			"did:iden3:privado:test:2Skqvp4vnSFuCZYrUGSKyCekftFAQh1p8GvtjNLXCm", // From address 0x0000...0004
-			"did:iden3:privado:test:2Skqvp4vnSFuLAixxvqw1CVNhJNi2h9B9N6wPbMLUf", // From address 0x0000...0005
+			"did:iden3:privado:test:2Skqvp4vnSFtq5bgAXbDs1Fs4AA5QGpRut9mCDfcC7", // From address 0x0000...0002
+			"did:iden3:privado:test:2Skqvp4vnSFtq5bgAXbDs1Fs4AA5QGpRut9mCDfwkT", // From address 0x0000...0003
+			"did:iden3:privado:test:2Skqvp4vnSFtq5bgAXbDs1Fs4AA5QGpRut9mCDgHJo", // From address 0x0000...0004
+			"did:iden3:privado:test:2Skqvp4vnSFtq5bgAXbDs1Fs4AA5QGpRut9mCDgcs9", // From address 0x0000...0005
 		}
 		// Use session ID to deterministically select a demo DID
 		sessionNum, _ := strconv.Atoi(sessionID)

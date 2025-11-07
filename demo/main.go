@@ -124,16 +124,17 @@ func newHTTPServer(
 	authenticationService := authentication.NewAuthenticationService(
 		authverifier,
 	)
-	iden3commService := iden3comm.NewIden3commService(
-		pkgmanager,
-		credentialRepository,
-	)
 	issuerService := issuer.NewIssuerService(
 		credentialRepository,
 		ethclients,
 		sanitizePrivateKeys(privateKeys),
 		ipfsCli,
 		merklizeOpts...,
+	)
+	iden3commService := iden3comm.NewIden3commService(
+		pkgmanager,
+		credentialRepository,
+		issuerService,
 	)
 
 	// init handlers
@@ -197,7 +198,6 @@ func chainIDToDIDPrefix(chainID int) string {
 		80002: "polygon:amoy",
 		21000: "privado:main",
 		21001: "privado:test",
-		31337: "privado:test", // Hardhat localhost network
 	}
 	return p[chainID]
 }

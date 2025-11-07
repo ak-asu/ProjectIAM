@@ -25,6 +25,12 @@ type state struct {
 }
 
 func (s *state) verify(_ circuits.CircuitID, pubsignals []string) error {
+	// Check if demo mode is enabled - skip all blockchain verification
+	if os.Getenv("DEMO_MODE") == "true" {
+		fmt.Println("[DEBUG] DEMO_MODE enabled - skipping blockchain verification in packagemanager")
+		return nil
+	}
+
 	bytePubsig, err := json.Marshal(pubsignals)
 	if err != nil {
 		return errors.Errorf("error marshaling pubsignals: %v", err)

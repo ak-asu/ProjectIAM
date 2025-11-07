@@ -42,11 +42,18 @@ func NewCredentailModelFromW3C(vc *verifiable.W3CCredential) (credentialModel, e
 	}
 
 	cs := vc.CredentialStatus.(*verifiable.CredentialStatus)
+
+	// Handle nil expiration
+	var expirationStr string
+	if vc.Expiration != nil {
+		expirationStr = vc.Expiration.Format(time.RFC3339Nano)
+	}
+
 	return credentialModel{
 		ID:                vc.ID,
 		Context:           vc.Context,
 		Type:              vc.Type,
-		Expiration:        vc.Expiration.Format(time.RFC3339Nano),
+		Expiration:        expirationStr,
 		IssuanceDate:      vc.IssuanceDate.Format(time.RFC3339Nano),
 		CredentialSubject: vc.CredentialSubject,
 		CredentialStatus: credentialStatusModel{
@@ -78,11 +85,17 @@ func (cm *credentialModel) ToW3C() (*verifiable.W3CCredential, error) {
 		proofs = append(proofs, proof)
 	}
 
-	expTime, err := time.Parse(time.RFC3339Nano, cm.Expiration)
-	if err != nil {
-		return nil,
-			errors.Wrapf(err, "failed to parse expiration time '%s'", cm.Expiration)
+	// Handle nil expiration
+	var expirationPtr *time.Time
+	if cm.Expiration != "" {
+		expTime, err := time.Parse(time.RFC3339Nano, cm.Expiration)
+		if err != nil {
+			return nil,
+				errors.Wrapf(err, "failed to parse expiration time '%s'", cm.Expiration)
+		}
+		expirationPtr = &expTime
 	}
+
 	issuanceTime, err := time.Parse(time.RFC3339Nano, cm.IssuanceDate)
 	if err != nil {
 		return nil,
@@ -93,7 +106,7 @@ func (cm *credentialModel) ToW3C() (*verifiable.W3CCredential, error) {
 		ID:                cm.ID,
 		Context:           cm.Context,
 		Type:              cm.Type,
-		Expiration:        &expTime,
+		Expiration:        expirationPtr,
 		IssuanceDate:      &issuanceTime,
 		CredentialSubject: cm.CredentialSubject,
 		CredentialStatus: verifiable.CredentialStatus{

@@ -17,12 +17,17 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
-echo -e "${YELLOW}Step 1: Stopping Docker containers...${NC}"
-docker-compose down
-echo -e "${GREEN}✓ Docker containers stopped${NC}"
+echo -e "${YELLOW}Step 1: Stopping and removing Docker containers...${NC}"
+docker-compose down -v
+echo -e "${GREEN}✓ Docker containers stopped and volumes removed${NC}"
 echo ""
 
-echo -e "${YELLOW}Step 2: Stopping Hardhat node...${NC}"
+echo -e "${YELLOW}Step 2: Cleaning up Docker volumes...${NC}"
+docker volume prune -f >/dev/null 2>&1 || true
+echo -e "${GREEN}✓ Unused Docker volumes removed${NC}"
+echo ""
+
+echo -e "${YELLOW}Step 3: Stopping Hardhat node...${NC}"
 if [ -f hardhat.pid ]; then
     HARDHAT_PID=$(cat hardhat.pid)
     if ps -p $HARDHAT_PID > /dev/null 2>&1; then
@@ -44,7 +49,7 @@ else
 fi
 echo ""
 
-echo -e "${YELLOW}Step 3: Stopping schema HTTP server...${NC}"
+echo -e "${YELLOW}Step 4: Stopping schema HTTP server...${NC}"
 if [ -f schema-server.pid ]; then
     SCHEMA_PID=$(cat schema-server.pid)
     if ps -p $SCHEMA_PID > /dev/null 2>&1; then
@@ -66,7 +71,13 @@ else
 fi
 echo ""
 
+echo -e "${YELLOW}Step 5: Cleaning up old log files...${NC}"
+rm -f hardhat.log schema-server.log
+echo -e "${GREEN}✓ Log files removed${NC}"
+echo ""
+
 echo -e "${GREEN}=========================================${NC}"
 echo -e "${GREEN}Shutdown completed successfully!${NC}"
+echo -e "${GREEN}All data and volumes have been cleared${NC}"
 echo -e "${GREEN}=========================================${NC}"
 echo ""

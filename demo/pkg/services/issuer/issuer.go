@@ -168,29 +168,29 @@ func (is *IssuerService) IssueCredential(
 		credentialRequest.MerklizedRootPosition = verifiable.CredentialMerklizedRootPositionIndex
 	}
 
-	logger.Debug("Parsing credential schema URL", slog.String("schema", credentialRequest.CredentialSchema))
+	logger.Info("Parsing credential schema URL", slog.String("schema", credentialRequest.CredentialSchema))
 	schemaRawURL, err := url.Parse(credentialRequest.CredentialSchema)
 	if err != nil {
 		return "", errors.Wrap(err, "error parsing schema url")
 	}
 
-	logger.Debug("Schema URL parsed", slog.String("scheme", schemaRawURL.Scheme), slog.String("host", schemaRawURL.Host))
+	logger.Info("Schema URL parsed", slog.String("scheme", schemaRawURL.Scheme), slog.String("host", schemaRawURL.Host))
 	var credentialSchemaBody io.ReadCloser
 	switch schemaRawURL.Scheme {
 	case "ipfs":
-		logger.Debug("Fetching schema from IPFS", slog.String("cid", schemaRawURL.Host))
+		logger.Info("Fetching schema from IPFS", slog.String("cid", schemaRawURL.Host))
 		credentialSchemaBody, err = is.ipfsCli.Cat(schemaRawURL.Host)
 		if err != nil {
 			return "", errors.Wrap(err, "error getting schema")
 		}
 	case "http", "https":
-		logger.Debug("Fetching schema from HTTP", slog.String("url", credentialRequest.CredentialSchema))
+		logger.Info("Fetching schema from HTTP", slog.String("url", credentialRequest.CredentialSchema))
 		resp, err := http.DefaultClient.Get(credentialRequest.CredentialSchema)
 		if err != nil {
 			logger.Error("HTTP request failed", slog.String("error", err.Error()))
 			return "", errors.Wrap(err, "error getting schema")
 		}
-		logger.Debug("HTTP response received", slog.Int("status", resp.StatusCode))
+		logger.Info("HTTP response received", slog.Int("status", resp.StatusCode))
 		if resp.StatusCode != http.StatusOK {
 			_ = resp.Body.Close()
 			return "", errors.Errorf("error getting schema: %s", resp.Status)
@@ -206,7 +206,7 @@ func (is *IssuerService) IssueCredential(
 		logger.Error("Failed to decode JSON schema", slog.String("error", err.Error()))
 		return "", errors.Wrap(err, "error decoding json schema to metadata")
 	}
-	logger.Debug("Creating verifiable credential",
+	logger.Info("Creating verifiable credential",
 		slog.String("issuerDID", issuerDID.String()),
 		slog.String("schema", jsonSchemaMetadata.Metadata.URIs["jsonLdContext"]))
 
@@ -221,7 +221,7 @@ func (is *IssuerService) IssueCredential(
 
 	printVerifiableCredential(verifiableCredential)
 
-	logger.Debug("Building core claim",
+	logger.Info("Building core claim",
 		slog.String("issuerDID", issuerDID.String()),
 		slog.Any("credentialSubject", verifiableCredential.CredentialSubject),
 		slog.Uint64("revNonce", *credentialRequest.RevNonce),
@@ -246,7 +246,7 @@ func (is *IssuerService) IssueCredential(
 			slog.Any("credentialSubject", verifiableCredential.CredentialSubject))
 		return "", errors.Wrap(err, "error build core claim")
 	}
-	logger.Debug("Core claim built successfully")
+	logger.Info("Core claim built successfully")
 
 	ethclient, contractAddress, err := is.lookforEthConnectForDID(issuerDID)
 	if err != nil {
@@ -266,6 +266,10 @@ func (is *IssuerService) IssueCredential(
 		return "", errors.Wrap(err, "error getting verification method index")
 	}
 
+	logger.Info("Sending transaction to blockchain",
+		slog.String("contractAddress", contractAddress),
+		slog.String("hindex", hindex.String()))
+
 	transaction, err := blockchain.IssueCredential(
 		ctx,
 		ethclient,
@@ -274,18 +278,26 @@ func (is *IssuerService) IssueCredential(
 		hindex, vindex,
 	)
 	if err != nil {
+		logger.Error("Failed to send transaction", slog.String("error", err.Error()))
 		return "", errors.Wrap(err, "error sending transaction")
 	}
+	logger.Info("Transaction sent", slog.String("txHash", transaction.Hash().Hex()))
 
+	logger.Info("Waiting for transaction confirmation...")
 	if err := blockchain.WaitTransaction(ctx, ethclient, transaction); err != nil {
+		logger.Error("Failed waiting for transaction", slog.String("error", err.Error()))
 		return "", errors.Wrap(err, "error waiting transaction")
 	}
+	logger.Info("Transaction confirmed")
 
+	logger.Info("Extracting MTP proof from blockchain...")
 	mtpProof, err := extractMTPProof(
 		ctx, hindex, ethclient, contractAddress)
 	if err != nil {
+		logger.Error("Failed to extract MTP proof", slog.String("error", err.Error()))
 		return "", errors.Wrap(err, "error extracting mtp proof")
 	}
+	logger.Info("MTP proof extracted successfully")
 	mtpProof.IssuerData.ID = issuerDID.String()
 	mtpProof.CoreClaim, err = coreClaim.Hex()
 	if err != nil {

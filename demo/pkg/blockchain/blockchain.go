@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const blockConfirmations = 3
+const blockConfirmations = 0 // Changed to 0 for local Hardhat testing (Hardhat only mines on transaction)
 
 func IsRevokedCredential(
 	ctx context.Context,
@@ -142,6 +142,11 @@ func WaitTransaction(ctx context.Context, ethclient *ethclientlib.Client, tx *ty
 	receipt, err := bind.WaitMined(ctx, ethclient, tx)
 	if err != nil {
 		return errors.Wrapf(err, "failed to wait transaction")
+	}
+
+	// If no confirmations required, return immediately after mining
+	if blockConfirmations == 0 {
+		return nil
 	}
 
 	tick := time.NewTicker(5 * time.Second)

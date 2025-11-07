@@ -4,8 +4,12 @@ ARG build_tags=""
 
 WORKDIR /build
 
-COPY . .
+# Copy go mod files first for better layer caching
+COPY go.mod go.sum ./
 RUN go mod download
+
+# Copy source code
+COPY . .
 
 ARG TARGETPLATFORM
 ARG TARGETARCH
@@ -30,6 +34,7 @@ RUN chmod g+rx,o+rx /
 WORKDIR /app
 
 COPY ./keys /app/keys
+COPY ./schemas /app/schemas
 COPY --from=base /build/onchain-merklized-issuer-demo /app/onchain-merklized-issuer-demo
 
 # Command to run
