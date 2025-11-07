@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+model Session {
+  id String @id @default(uuid())
+  did String?
+  didVerified Boolean @default(false)
+  verifiedAt DateTime?
+  studentId String?
+  nonce String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  student User? @relation(fields: [studentId], references: [studentId])
+
+  @@index([did])
+  @@index([studentId])
+}
+
+model User {
+  id String @id @default(uuid())
+  studentId String @unique
+  name String
+  email String @unique
+  passwordHash String?
+  role String @default("student")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  didBinding DIDBinding?
+  sessions Session[]
+  credentials CredentialRecord[]
+
+  @@index([email])
+  @@index([studentId])
+}
+
+model DIDBinding {
+  id String @id @default(uuid())
+  studentId String @unique
+  did String @unique
+  status String @default("active")
+  boundAt DateTime @default(now())
+  user User @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+
+  @@index([did])
+}
+
+model CredentialRecord {
+  id String @id @default(uuid())
+  credentialHash String
+  merkleRoot String
+  txHash String
+  holderDID String
+  studentId String
+  issuerDID String
+  credentialType String
+  schemaUrl String
+  ipfsCID String
+  revocationNonce Int
+  issuedAt DateTime @default(now())
+  expiresAt DateTime?
+  isRevoked Boolean @default(false)
+  revocationReason String?
+  revokedAt DateTime?
+  issuedBy String?
+  holder User @relation(fields: [studentId], references: [studentId])
+
+  @@index([holderDID])
+  @@index([studentId])
+  @@index([issuerDID])
+  @@index([isRevoked])
+}
+
+model VerificationSession {
+  id String @id @default(uuid())
+  verifierId String?
+  policy Json
+  proofRequest Json?
+  status String @default("pending")
+  proofResponse Json?
+  result Json?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  verifiedAt DateTime?
+
+  @@index([verifierId])
+  @@index([status])
+}
+
+model Issuer {
+  id String @id @default(uuid())
+  issuerDID String @unique
+  issuerAddress String
+  name String
+  country String?
+  isActive Boolean @default(true)
+  registeredAt DateTime @default(now())
+
+  @@index([issuerDID])
+  @@index([issuerAddress])
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+  eventType String
+  entityType String
+  entityId String?
+  actor String?
+  actorType String?
+  details Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([eventType])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([createdAt])
+}

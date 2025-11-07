@@ -280,7 +280,7 @@ const result = await verifier.fullVerify(proofResponse, proofRequest);
 
 ### 7.2 Issue
 - `POST /issue/prepare` → lookup by `studentId`
-- `POST /issue/credentials` → uses **subjectId = DID** from session; returns `{ claimId, txHash, stateRoot }`
+- `POST /issue/credentials` → uses **subjectId = DID** from session; returns `{ claimId, txHash, merkleRoot }`
 - `GET /issue/offer?claimId=...&subjectDID=...` → **credentials/1.0/offer**
 
 ### 7.3 Verify (Off‑chain)
@@ -298,7 +298,7 @@ const result = await verifier.fullVerify(proofResponse, proofRequest);
 | **users** | studentId (PK), name, email | University directory |
 | **did_bindings** | id (PK), studentId (FK), did (unique), status, bound_at | First‑time binding only |
 | **sessions** | sid (PK), did, didVerified, studentId?, createdAt, expiresAt | For Auth & Issue |
-| **issue_records** | claimId, did, schema, revNonce, stateRoot, txHash, createdAt | Issuance audit |
+| **issue_records** | claimId, did, schema, revNonce, merkleRoot, txHash, createdAt | Issuance audit |
 | **verify_sessions** | verifyId, policy, status, proof?, result?, createdAt, expiresAt | Off‑chain verify |
 
 **Data residency:** VC plaintext remains in the **wallet only**. Backend stores minimal metadata and proofs transiently.
