@@ -1,0 +1,21 @@
+.git
+.github
+
+.dockerignore
+.gitignore
+docker-compose.yaml
+
+build
+tests
+
+
+.golangci.yml
+README.md
+first-run.sh
+
+// Ignore client for backend build
+client
+
+// Ignore data directory (MongoDB files)
+data
+contracts
