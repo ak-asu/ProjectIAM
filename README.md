@@ -29,6 +29,42 @@ Understanding the flow:
 
 When a student shares their credential, they are not handing over all their data. They generate a zero-knowledge proof that reveals only what the employer asked for. The proof is cryptographically verified off-chain, so it is fast and cheap.
 
+When you call `issueCredential()`:
+
+```
+User signs transaction with private key
+   ↓
+Transaction sent to blockchain network
+   ↓
+Validators pick it up
+   ↓
+Smart contract code executes
+   ↓
+Data written to blockchain
+   ↓
+Event emitted
+   ↓
+Transaction confirmed
+   ↓
+credentialId returned to caller
+```
+
+Off-chain Verification Basic Flow
+
+```
+Holder presents credential
+   ↓
+Verifier checks your contract with isCredentialValid
+   ↓
+If valid, verifier uses Privado ID Verifier SDK
+   ↓
+SDK checks merkle roots match
+   ↓
+SDK verifies zero-knowledge proof
+   ↓
+Result is either Valid or Invalid
+```
+
 ## Features
 
 - **Privacy by design**: No personal information ever touches the blockchain as everything is just cryptographic hashes
@@ -61,7 +97,7 @@ When a student shares their credential, they are not handing over all their data
 - **QR Code**: QRCode.js for generating authentication and credential offer QRs
 
 ### Smart Contracts
-- **Language**: Solidity ^0.8.28
+- **Language**: Solidity ^0.8.20
 - **Development**: Hardhat framework
 - **State Management**: On-chain state roots for credential claims and revocation
 
