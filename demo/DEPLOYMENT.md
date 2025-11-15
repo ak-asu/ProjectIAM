@@ -40,38 +40,8 @@ This script will:
 2. Stop the Hardhat node
 3. Stop the schema HTTP server
 
-## Manual Deployment
 
-If you prefer to deploy manually:
-
-### 1. Start Hardhat Node
-
-```bash
-cd contracts
-npx hardhat node --hostname 0.0.0.0
-```
-
-### 2. Deploy Contracts (in a new terminal)
-
-```bash
-cd contracts
-npx hardhat run scripts/deployIdentityExampleLocalhost.ts --network localhost
-```
-
-### 3. Start Schema HTTP Server
-
-```bash
-cd schemas
-python3 -m http.server 8000 --bind 0.0.0.0
-```
-
-### 4. Start Docker Services
-
-```bash
-docker-compose up -d --build
-```
-
-### 5. (Optional) Expose Backend to Public Network
+### 4. Expose Backend to Public Network
 
 If you want to test with a real PolygonID wallet app:
 
