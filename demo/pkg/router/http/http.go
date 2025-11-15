@@ -14,6 +14,7 @@ type Handlers struct {
 	authenticationHandler handlers.AuthenticationHandlers
 	iden3commHandler      handlers.Iden3commHandlers
 	issuerHandler         handlers.IssuerHandlers
+	verificationHandler   handlers.VerificationHandlers
 }
 
 func NewHandlers(
@@ -21,12 +22,14 @@ func NewHandlers(
 	authHendler handlers.AuthenticationHandlers,
 	iden3commHandler handlers.Iden3commHandlers,
 	issuerHandler handlers.IssuerHandlers,
+	verificationHandler handlers.VerificationHandlers,
 ) Handlers {
 	return Handlers{
 		systemHandler:         systemHandler,
 		authenticationHandler: authHendler,
 		iden3commHandler:      iden3commHandler,
 		issuerHandler:         issuerHandler,
+		verificationHandler:   verificationHandler,
 	}
 }
 
@@ -47,6 +50,7 @@ func (h *Handlers) NewRouter(opts ...Option) http.Handler {
 	h.agentRouters(r)
 	h.apiRouters(r)
 	h.schemaRouters(r)
+	h.verificationRouters(r)
 
 	return r
 }
@@ -86,4 +90,10 @@ func (h Handlers) schemaRouters(r *chi.Mux) {
 	// Serve schema files from /schemas directory
 	fileServer := http.FileServer(http.Dir("./schemas"))
 	r.Handle("/schemas/*", http.StripPrefix("/schemas", fileServer))
+}
+
+func (h Handlers) verificationRouters(r *chi.Mux) {
+	r.Post("/api/v1/verification/request", h.verificationHandler.CreateVerificationRequest)
+	r.Post("/api/v1/verification/callback", h.verificationHandler.VerificationCallback)
+	r.Get("/api/v1/verification/status", h.verificationHandler.VerificationStatus)
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/iden3/go-service-template/pkg/services/iden3comm"
 	"github.com/iden3/go-service-template/pkg/services/issuer"
 	"github.com/iden3/go-service-template/pkg/services/system"
+	"github.com/iden3/go-service-template/pkg/services/verification"
 	"github.com/iden3/go-service-template/pkg/shutdown"
 	httptransport "github.com/iden3/go-service-template/pkg/transport/http"
 	libiden3comm "github.com/iden3/iden3comm/v2"
@@ -136,6 +137,10 @@ func newHTTPServer(
 		credentialRepository,
 		issuerService,
 	)
+	verificationService := verification.NewVerificationService(
+		authverifier,
+		cfg.ExternalHost+"/api/v1/verification/callback",
+	)
 
 	// init handlers
 	systemHandlers := handlers.NewSystemHandler(
@@ -153,6 +158,9 @@ func newHTTPServer(
 		issuerService,
 		cfg.ExternalHost,
 	)
+	verificationHandlers := handlers.NewVerificationHandlers(
+		verificationService,
+	)
 
 	// init routers
 	h := httprouter.NewHandlers(
@@ -160,6 +168,7 @@ func newHTTPServer(
 		authenticationHandlers,
 		iden3commHandlers,
 		issuerHandlers,
+		verificationHandlers,
 	)
 	routers := h.NewRouter(
 		httprouter.WithOrigins(cfg.HTTPServer.Origins),
