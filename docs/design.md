@@ -465,6 +465,8 @@ B-->>VUI: Show result (Valid/Revoked/Expired/NotMatch)
 
 ## 9. Frontend Integration
 
+The UI should have entry points for issuing and verification.
+
 ### 9.1 Authentication Flow (Step 1 for Issuing)
 
 **User Story:** Student authenticates their DID before receiving credentials
@@ -630,7 +632,7 @@ const pollVerification = setInterval(async () => {
 - For this demo: Simple table for specifying:
   - **Query conditions** (ZK proof): graduationYear, GPA, etc.
   - **Disclosed fields** (reveal): name, degree, university, etc.
-  - **Operators**: `$eq`, `$gt`, `$lt`, `$in`, `$nin`, `$ne`
+  - **Operators**: `$eq`, `$gt`, `$lt`, `$in`, `$nin`, `$ne`. We can hard-code it rather than allow the verifier specifies.
 
 ---
 
