@@ -127,7 +127,7 @@ end
 - `GET /auth/request/:sessionId` → **authorization/1.0/request** JSON `{ callbackUrl, message(nonce), scope:[] }` (**STANDARD**).
 - `POST /auth/callback?sessionId=...` ← wallet **authorization/1.0/response** (**STANDARD**); backend calls `VerifierSDK.fullVerify(...)`.
 - `POST /auth/sso` → `{ username, password, did }` bind first‑time only.
-- `GET /auth/status?sessionId=...` → `{ didVerified, studentBound }`.
+- `GET /auth/status?sessionId=...` → `{ didVerified, studentLinked }`.
 
 ### 4.3 How issuing receives “auth context”
 - Backend session keeps `{ did, didVerified:true, verifiedAt, studentId? }` after Auth callback.
@@ -276,7 +276,7 @@ const result = await verifier.fullVerify(proofResponse, proofRequest);
 - `GET /auth/request/:sessionId` → **authorization/1.0/request**
 - `POST /auth/callback?sessionId=...` ← **authorization/1.0/response**
 - `POST /auth/sso` → `{ username, password, did }` (bind first‑time)
-- `GET /auth/status?sessionId=...` → `{ didVerified, studentBound }`
+- `GET /auth/status?sessionId=...` → `{ didVerified, studentLinked }`
 
 ### 7.2 Issue
 - `POST /issue/prepare` → lookup by `studentId`

@@ -52,3 +52,7 @@ Thumbs.db
 *.pem
 *.key
 secrets/
+
+deployments/
+dist/
+build/

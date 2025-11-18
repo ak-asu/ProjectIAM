@@ -28,7 +28,7 @@ module.exports = {
       accounts: process.env.ISSUER_PRIVATE_KEY
         ? [process.env.ISSUER_PRIVATE_KEY]
         : [],
-      gasPrice: 'auto',
+      gasPrice: 35000000000, // 35 gwei
     },
     polygon: {
       url: process.env.RPC_URL,
@@ -40,14 +40,11 @@ module.exports = {
     },
   },
   etherscan: {
-    apiKey: {
-      polygonAmoy: process.env.POLYGONSCAN_API_KEY || '',
-      polygon: process.env.POLYGONSCAN_API_KEY || '',
-    },
+    apiKey: process.env.POLYGONSCAN_API_KEY || '',
     customChains: [
       {
         network: 'polygonAmoy',
-        chainId: process.env.CHAIN_ID ? parseInt(process.env.CHAIN_ID) : 80002,
+        chainId: 80002,
         urls: {
           apiURL: 'https://api-amoy.polygonscan.com/api',
           browserURL: 'https://amoy.polygonscan.com',
@@ -62,7 +59,9 @@ module.exports = {
     noColors: true,
   },
   paths: {
-    sources: './contracts',
+    sources: './',
     scripts: './scripts',
+    artifacts: './artifacts',
+    cache: './cache',
   },
 };
