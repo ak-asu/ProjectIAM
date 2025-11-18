@@ -73,7 +73,7 @@ interface IUniCredRegistry {
     }
 
     // Only registered issuers issue a new credential to a student
-    // Returns unique credentialId for the new credential
+    // Returns unique credId for the new credential
     function issueCredential(
         string calldata holderDID,
         bytes32 credHash,
