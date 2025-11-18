@@ -46,7 +46,7 @@ Event emitted
    ↓
 Transaction confirmed
    ↓
-credentialId returned to caller
+credId returned to caller
 ```
 
 Off-chain Verification Basic Flow
