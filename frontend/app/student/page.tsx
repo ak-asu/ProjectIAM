@@ -30,6 +30,8 @@ export default function StudentPortal() {
         }
       }).catch(() => { localStorage.removeItem('student_session_id'); })
         .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
   }, []);
 
