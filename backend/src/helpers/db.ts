@@ -6,10 +6,10 @@ let supabase: SupabaseClient | null = null;
 
 export function getSupabaseClient() {
   if (!supabase) {
-    if (!config.supabaseUrl || !config.supabaseAnonKey) {
-      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY must be set in environment variables');
+    if (!config.supabaseUrl || !config.supabaseServiceKey) {
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in environment variables');
     }
-    supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    supabase = createClient(config.supabaseUrl, config.supabaseServiceKey, {
       auth: {
         persistSession: false,
       },

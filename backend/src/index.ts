@@ -26,7 +26,7 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Key'],
     exposedHeaders: ['Content-Length', 'X-Request-Id'],
     maxAge: 86400,
   })
@@ -43,15 +43,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.text({ type: 'text/plain', limit: '10mb' }));
 
-if (config.nodeEnv === 'development') {
-  app.use((req, _res, next) => {
-    if (req.method === 'POST') {
-      console.log(`POST ${req.path} | Content-Type: ${req.get('Content-Type')}`);
-    }
-    next();
-  });
-  app.use(requestLogger);
-}
+app.use(requestLogger);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/issue', issuerRoutes);
@@ -84,9 +76,9 @@ async function startServer() {
     console.log('Starting Unicredify Backend');
     const dbConnected = await checkDbConnection();
     if (!dbConnected) {
-      console.warn('Warning: Database connection failed');
+      console.warn('Database connection failed');
     } else {
-      console.log('Database connected');
+      console.log('Database connected successfully');
     }
     if (config.contractAddr && config.rpcUrl) {
       await initializeBlockchain();
@@ -97,13 +89,10 @@ async function startServer() {
     app.listen(config.port, () => {
       console.log(`Server running on port ${config.port}`);
     });
-
     process.on('SIGTERM', () => {
-      console.log('SIGTERM received, shutting down');
       process.exit(0);
     });
     process.on('SIGINT', () => {
-      console.log('SIGINT received, shutting down');
       process.exit(0);
     });
   } catch (error) {

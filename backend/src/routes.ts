@@ -6,32 +6,39 @@ import { VerifierController } from './controllers/VerifierController';
 const authRoutes = Router();
 const authController = new AuthController();
 
+// Student authentication (DID-based)
 authRoutes.post('/start', authController.startAuthSession);
 authRoutes.get('/request/:sessionId', authController.getAuthRequest);
 authRoutes.post('/callback', authController.handleAuthCallback);
 authRoutes.post('/bind', authController.linkStudent);
 authRoutes.get('/status/:sessionId', authController.getStatus);
+// Portal authentication (employer email/password login)
+authRoutes.post('/portal/login', authController.portalLogin);
+authRoutes.post('/portal/logout', authController.portalLogout);
+authRoutes.get('/portal/verify', authController.verifyPortalToken);
 
 const issuerRoutes = Router();
 const issuerController = new IssuerController();
 
-issuerRoutes.post('/prepare', issuerController.prepareCred);
-issuerRoutes.post('/credential', issuerController.issueCred);
-issuerRoutes.get('/offer/:credId', issuerController.getOffer);
-issuerRoutes.post('/revoke', issuerController.revokeCred);
-issuerRoutes.get('/credential/:credId', issuerController.getCredential);
-issuerRoutes.get('/credentials', issuerController.getAllCredentials);
-issuerRoutes.get('/holder/:holderDID', issuerController.getHolderCreds);
-issuerRoutes.post('/validate-schema', issuerController.validateSchema);
+// Issuer routes (require admin API key authentication)
+issuerRoutes.post('/prepare', authController.requireAdminAuth, issuerController.prepareCred);
+issuerRoutes.post('/credential', authController.requireAdminAuth, issuerController.issueCred);
+issuerRoutes.get('/offer/:credId', issuerController.getOffer); // Public - wallet needs to fetch
+issuerRoutes.post('/revoke', authController.requireAdminAuth, issuerController.revokeCred);
+issuerRoutes.get('/credential/:credId', issuerController.getCredential); // Public - for viewing
+issuerRoutes.get('/credentials', authController.requireAdminAuth, issuerController.getAllCredentials);
+issuerRoutes.get('/holder/:holderDID', issuerController.getHolderCreds); // Public - student can view own
+issuerRoutes.post('/validate-schema', authController.requireAdminAuth, issuerController.validateSchema);
 
 const verifierRoutes = Router();
 const verifierController = new VerifierController();
 
-verifierRoutes.post('/session', verifierController.createSession);
+// Verifier routes (require employer authentication)
+verifierRoutes.post('/session', authController.requireEmployerAuth, verifierController.createSession);
 verifierRoutes.get('/request/:verifyId', verifierController.getProofReq);
 verifierRoutes.post('/callback', verifierController.handleProofCallback);
 verifierRoutes.get('/status/:verifyId', verifierController.getStatus);
-verifierRoutes.get('/sessions', verifierController.getSessions);
+verifierRoutes.get('/sessions', authController.requireEmployerAuth, verifierController.getSessions);
 verifierRoutes.get('/check/:credId', verifierController.checkValidity);
 
 export { authRoutes, issuerRoutes, verifierRoutes };

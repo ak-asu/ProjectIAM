@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '../../lib/api';
 
@@ -24,6 +24,9 @@ interface VerificationResult {
 }
 
 export default function EmployerPortal() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userInfo, setUserInfo] = useState<{ email: string; name: string; role: string } | null>(null);
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [activeTab, setActiveTab] = useState<'verify' | 'history'>('verify');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -35,6 +38,56 @@ export default function EmployerPortal() {
   });
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [verifyResult, setVerifyResult] = useState<VerificationResult | null>(null);
+
+  useEffect(() => {
+    try {
+      api.verifyPortalToken().then((result) => {
+        if (result.success && result.user && result.user.role === 'employer') {
+          setIsAuthenticated(true);
+          setUserInfo(result.user);
+        }
+      }).catch(() => {
+        setIsAuthenticated(false);
+      });
+    } catch (err) {
+      setIsAuthenticated(false);
+    }
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const result = await api.portalLogin(loginForm.email, loginForm.password);
+      if (result.success && result.user) {
+        if (result.user.role !== 'employer') {
+          setError('Access denied. Employer account required.');
+          await api.portalLogout();
+          return;
+        }
+        setIsAuthenticated(true);
+        setUserInfo(result.user);
+      } else {
+        setError(result.error || 'Login failed');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.portalLogout();
+      setIsAuthenticated(false);
+      setUserInfo(null);
+      setLoginForm({ email: '', password: '' });
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
 
   const handleCreateVerification = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,31 +160,108 @@ export default function EmployerPortal() {
     setTimeout(() => clearInterval(interval), 320000);
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-gray-900 to-gray-800">
+        <div className="container mx-auto px-4 py-8">
+          <div className="mb-8">
+            <Link href="/" className="text-green-400 hover:underline">
+              Home
+            </Link>
+          </div>
+          <div className="max-w-md mx-auto">
+            <header className="text-center mb-8">
+              <h1 className="text-4xl font-bold text-white mb-2">
+                Employer Login
+              </h1>
+              <p className="text-gray-300">
+                Sign in to verify candidate credentials
+              </p>
+            </header>
+            <div className="bg-gray-800 rounded-lg shadow-lg p-8">
+              {error && (
+                <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded mb-4">
+                  {error}
+                </div>
+              )}
+              <form onSubmit={handleLogin} className="space-y-6">
+                <div>
+                  <label className="block text-gray-300 mb-2 font-semibold">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={loginForm.email}
+                    onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
+                    required
+                    placeholder="abc@gmail.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-300 mb-2 font-semibold">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={loginForm.password}
+                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
+                    required
+                    placeholder="••••••••"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50"
+                >
+                  {loading ? 'Logging in...' : 'Login'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-linear-to-br from-green-50 to-teal-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-linear-to-br from-gray-900 to-gray-800">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <Link href="/" className="text-green-600 dark:text-green-400 hover:underline">
+        <div className="mb-8 flex justify-between items-center">
+          <Link href="/" className="text-green-400 hover:underline">
             Home
           </Link>
+          <div className="flex items-center gap-4">
+            <span className="text-gray-300">
+              {userInfo?.name} ({userInfo?.email})
+            </span>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+            >
+              Logout
+            </button>
+          </div>
         </div>
         <div className="max-w-6xl mx-auto">
           <header className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            <h1 className="text-4xl font-bold text-white mb-2">
               Employer Portal
             </h1>
-            <p className="text-gray-600 dark:text-gray-300">
+            <p className="text-gray-300">
               Verify candidate credentials instantly
             </p>
           </header>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-            <div className="border-b border-gray-200 dark:border-gray-700">
+          <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+            <div className="border-b border-gray-700">
               <div className="flex">
                 <button
                   onClick={() => setActiveTab('verify')}
                   className={`flex-1 px-6 py-4 font-semibold ${activeTab === 'verify'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-700 text-gray-300'
                     }`}
                 >
                   Verify Credential
@@ -139,8 +269,8 @@ export default function EmployerPortal() {
                 <button
                   onClick={() => setActiveTab('history')}
                   className={`flex-1 px-6 py-4 font-semibold ${activeTab === 'history'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-700 text-gray-300'
                     }`}
                 >
                   Verification History
@@ -149,25 +279,25 @@ export default function EmployerPortal() {
             </div>
             <div className="p-8">
               {error && (
-                <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-200 px-4 py-3 rounded mb-4">
+                <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded mb-4">
                   {error}
                 </div>
               )}
               {activeTab === 'verify' && (
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                  <h2 className="text-2xl font-bold text-white mb-6">
                     Create Verification Request
                   </h2>
                   {!qrCodeUrl && (
                     <form onSubmit={handleCreateVerification} className="space-y-6">
-                      <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6">
-                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <div className="bg-blue-900 border border-blue-700 rounded-lg p-4 mb-6">
+                        <p className="text-sm text-blue-300">
                           Specify what credentials to verify (all optional), generate a QR code, and get instant verification via zero-knowledge proof
                         </p>
                       </div>
                       <div className="grid md:grid-cols-2 gap-6">
                         <div>
-                          <label className="block text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                          <label className="block text-gray-300 mb-2 font-semibold">
                             University
                           </label>
                           <input
@@ -176,12 +306,12 @@ export default function EmployerPortal() {
                             onChange={(e) =>
                               setVerifyForm({ ...verifyForm, university: e.target.value })
                             }
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                             placeholder="Any university"
                           />
                         </div>
                         <div>
-                          <label className="block text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                          <label className="block text-gray-300 mb-2 font-semibold">
                             Degree
                           </label>
                           <select
@@ -189,7 +319,7 @@ export default function EmployerPortal() {
                             onChange={(e) =>
                               setVerifyForm({ ...verifyForm, degree: e.target.value })
                             }
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                           >
                             <option value="">Any Degree</option>
                             <option>Bachelor of Science</option>
@@ -200,7 +330,7 @@ export default function EmployerPortal() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                          <label className="block text-gray-300 mb-2 font-semibold">
                             Major
                           </label>
                           <input
@@ -209,12 +339,12 @@ export default function EmployerPortal() {
                             onChange={(e) =>
                               setVerifyForm({ ...verifyForm, major: e.target.value })
                             }
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                             placeholder="Any major"
                           />
                         </div>
                         <div>
-                          <label className="block text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                          <label className="block text-gray-300 mb-2 font-semibold">
                             Min Graduation Year
                           </label>
                           <input
@@ -226,7 +356,7 @@ export default function EmployerPortal() {
                                 minGraduationYear: e.target.value,
                               })
                             }
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                             placeholder="2020"
                             min="1900"
                             max={new Date().getFullYear() + 10}
@@ -244,10 +374,10 @@ export default function EmployerPortal() {
                   )}
                   {qrCodeUrl && !verifyResult && (
                     <div className="text-center">
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                      <h3 className="text-xl font-bold text-white mb-4">
                         Have Candidate Scan QR
                       </h3>
-                      <p className="text-gray-600 dark:text-gray-300 mb-6">
+                      <p className="text-gray-300 mb-6">
                         Candidate scans with Privado ID wallet
                       </p>
                       <div className="bg-white p-8 rounded-lg inline-block">
@@ -259,22 +389,22 @@ export default function EmployerPortal() {
                           </code>
                         </div>
                       </div>
-                      <p className="mt-6 text-sm text-gray-500">Waiting...</p>
+                      <p className="mt-6 text-sm text-gray-400">Waiting...</p>
                     </div>
                   )}
                   {verifyResult && (
                     <div className={`rounded-lg p-6 ${verifyResult.verified
-                        ? 'bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700'
-                        : 'bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700'
+                      ? 'bg-green-900 border border-green-700'
+                      : 'bg-red-900 border border-red-700'
                       }`}>
                       <h3 className={`text-2xl font-bold mb-4 ${verifyResult.verified
-                          ? 'text-green-800 dark:text-green-200'
-                          : 'text-red-800 dark:text-red-200'
+                        ? 'text-green-200'
+                        : 'text-red-200'
                         }`}>
                         {verifyResult.verified ? 'Verification Successful' : 'Verification Failed'}
                       </h3>
                       {verifyResult.verified && (
-                        <div className="space-y-3 text-gray-700 dark:text-gray-300">
+                        <div className="space-y-3 text-gray-300">
                           <div>
                             <span className="font-semibold">Holder DID:</span>{' '}
                             <code className="text-xs bg-white px-2 py-1 rounded">
@@ -296,7 +426,7 @@ export default function EmployerPortal() {
                         </div>
                       )}
                       {!verifyResult.verified && (
-                        <p className="text-red-700 dark:text-red-300">
+                        <p className="text-red-300">
                           {verifyResult.failureReason || 'Verification failed'}
                         </p>
                       )}
@@ -305,7 +435,7 @@ export default function EmployerPortal() {
                           setQrCodeUrl('');
                           setVerifyResult(null);
                         }}
-                        className="mt-6 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-6 py-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
+                        className="mt-6 bg-gray-700 text-gray-300 px-6 py-2 rounded-lg border border-gray-600 hover:bg-gray-600"
                       >
                         Create New Verification
                       </button>
@@ -315,11 +445,11 @@ export default function EmployerPortal() {
               )}
               {activeTab === 'history' && (
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                  <h2 className="text-2xl font-bold text-white mb-6">
                     Verification History
                   </h2>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-                    <p className="text-gray-600 dark:text-gray-300">
+                  <div className="bg-gray-700 rounded-lg p-6">
+                    <p className="text-gray-300">
                       No history yet. Complete your first verification to see results here.
                     </p>
                   </div>

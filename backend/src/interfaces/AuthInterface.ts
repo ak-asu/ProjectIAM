@@ -38,4 +38,22 @@ export interface IAuthService {
   getStudentForDID(did: string): Promise<string | null>;
   invalidateSession(session_id: string): Promise<void>;
   cleanupExpiredSessions(): Promise<number>; // Run via cron
+  portalLogin(email: string, password: string): Promise<{
+    success: boolean;
+    token?: string;
+    user?: {
+      id: string;
+      email: string;
+      name: string;
+      role: string;
+    };
+    expiresAt?: string;
+    error?: string;
+  }>;
+  validatePortalToken(token: string): Promise<{
+    userId: string;
+    email: string;
+    name: string;
+    role: string;
+  } | null>;
 }

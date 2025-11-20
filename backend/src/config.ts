@@ -6,7 +6,7 @@ export const config = {
   port: parseInt(process.env.PORT || '3001'),
   nodeEnv: process.env.NODE_ENV || 'development',
   supabaseUrl: process.env.SUPABASE_URL || '',
-  supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
+  supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY || '',
   rpcUrl: process.env.RPC_URL || '',
   contractAddr: process.env.CONTRACT_ADDRESS || '',
   issuerPrivateKey: process.env.ISSUER_PRIVATE_KEY || '',
@@ -22,6 +22,7 @@ export const config = {
   pinataSecretKey: process.env.PINATA_SECRET_KEY || '',
   schemaUrl: process.env.SCHEMA_URL || 'ipfs://QmDegreeCredentialSchema',
   encryptionSecret: process.env.ENCRYPTION_SECRET || '',
+  adminApiKey: process.env.ADMIN_API_KEY || '',
   corsOrigin: process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
     : ['*']

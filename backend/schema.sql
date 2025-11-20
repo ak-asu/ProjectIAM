@@ -13,9 +13,8 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE INDEX idx_sessions_did ON sessions(did);
-CREATE INDEX idx_sessions_student_id ON sessions(student_id);
 
--- University users
+-- Users
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     student_id TEXT UNIQUE NOT NULL,
@@ -60,7 +59,6 @@ CREATE TABLE IF NOT EXISTS credential_records (
 
 CREATE INDEX idx_credentials_holder ON credential_records(holder_did);
 CREATE INDEX idx_credentials_student ON credential_records(student_id);
-CREATE INDEX idx_credentials_revoked ON credential_records(is_revoked);
 
 CREATE TABLE IF NOT EXISTS verification_sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -73,19 +71,6 @@ CREATE TABLE IF NOT EXISTS verification_sessions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     verified_at TIMESTAMP WITH TIME ZONE
-);
-
-CREATE INDEX idx_verify_sessions_status ON verification_sessions(status);
-
--- Registered credential issuers
-CREATE TABLE IF NOT EXISTS issuers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    issuer_did TEXT UNIQUE NOT NULL,
-    issuer_address TEXT NOT NULL,
-    name TEXT NOT NULL,
-    country TEXT,
-    is_active BOOLEAN DEFAULT TRUE NOT NULL,
-    registered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -102,7 +87,6 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 CREATE INDEX idx_audit_event_type ON audit_logs(event_type);
-CREATE INDEX idx_audit_created ON audit_logs(created_at);
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -111,7 +95,32 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
 CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Sample users
+INSERT INTO users (student_id, name, email, password_hash, role)
+VALUES
+    ('STU001', 'John Smith', 'john.smith@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'), -- Password: Password123!
+    ('STU002', 'Emily Johnson', 'emily.johnson@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
+    ('STU003', 'Michael Davis', 'michael.davis@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
+    ('STU004', 'Sarah Williams', 'sarah.williams@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
+    ('STU005', 'James Brown', 'james.brown@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
+    ('STU006', 'Jennifer Garcia', 'jennifer.garcia@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
+    ('STU007', 'David Martinez', 'david.martinez@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
+    ('STU008', 'Lisa Rodriguez', 'lisa.rodriguez@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
+    ('STU009', 'Robert Lee', 'robert.lee@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
+    ('STU010', 'Maria Hernandez', 'maria.hernandez@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
+    ('EMP001', 'TechCorp HR', 'hr@techcorp.com', '$2b$10$4fSYrDFbIx8.IM3r1QANP.KMZonWKJtlgtaJ7BZrBxJg3wfTvERuW', 'employer'), -- Password: Employer123!
+    ('EMP002', 'Global Solutions', 'recruiter@globalsolutions.com', '$2b$10$4fSYrDFbIx8.IM3r1QANP.KMZonWKJtlgtaJ7BZrBxJg3wfTvERuW', 'employer')
+ON CONFLICT (student_id) DO NOTHING;
+
+GRANT ALL ON TABLE sessions TO service_role;
+GRANT ALL ON TABLE verification_sessions TO service_role;
+GRANT ALL ON TABLE users TO service_role;
+GRANT ALL ON TABLE did_bindings TO service_role;
+GRANT ALL ON TABLE credential_records TO service_role;
+GRANT ALL ON TABLE audit_logs TO service_role;

@@ -61,16 +61,6 @@ export interface VerificationSession {
   verified_at: string | null;
 }
 
-export interface Issuer {
-  id: string;
-  issuer_did: string;
-  issuer_address: string;
-  name: string;
-  country: string | null;
-  is_active: boolean;
-  registered_at: string;
-}
-
 export interface AuditLog {
   id: string;
   event_type: string;
@@ -303,6 +293,5 @@ export const Tables = {
   DID_BINDINGS: 'did_bindings',
   CREDENTIAL_RECORDS: 'credential_records',
   VERIFICATION_SESSIONS: 'verification_sessions',
-  ISSUERS: 'issuers',
   AUDIT_LOGS: 'audit_logs',
 } as const;
