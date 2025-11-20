@@ -83,7 +83,7 @@ export default function AdminPortal() {
       });
       if (result.success) {
         setSuccess('Credential issued successfully!');
-        setOfferQR(result.offerQRData?.qrCodeUrl || '');
+        setOfferQR(result.offer_qr_data?.qr_code_url || '');
         setCredForm({
           studentId: '',
           university: 'Arizona State University',

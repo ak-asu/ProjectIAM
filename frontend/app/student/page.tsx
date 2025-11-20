@@ -34,10 +34,10 @@ export default function StudentPortal() {
       try {
         const status = await api.getAuthStatus(sid);
         setAuthStatus(status);
-        if (status.didVerified && !status.studentLinked) {
+        if (status.did_verified && !status.student_linked) {
           setShowLinking(true);
           clearInterval(interval);
-        } else if (status.studentLinked) {
+        } else if (status.student_linked) {
           clearInterval(interval);
         }
       } catch (err) {
@@ -49,7 +49,7 @@ export default function StudentPortal() {
 
   const handleLinking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!authStatus?.didVerified) return;
+    if (!authStatus?.did_verified) return;
     try {
       setLoading(true);
       setError('');
@@ -112,7 +112,7 @@ export default function StudentPortal() {
               </button>
             </div>
           )}
-          {qrCodeUrl && !authStatus?.didVerified && (
+          {qrCodeUrl && !authStatus?.did_verified && (
             <div className="bg-gray-800 rounded-lg shadow-lg p-8">
               <h2 className="text-2xl font-bold text-white mb-4">
                 Scan QR Code
@@ -173,7 +173,7 @@ export default function StudentPortal() {
               </form>
             </div>
           )}
-          {authStatus?.studentLinked && (
+          {authStatus?.student_linked && (
             <div className="bg-gray-800 rounded-lg shadow-lg p-8">
               <h2 className="text-2xl font-bold text-green-600 mb-4">
                 Authentication Successful

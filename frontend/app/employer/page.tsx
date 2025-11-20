@@ -6,20 +6,20 @@ import { api } from '../../lib/api';
 
 interface VerificationResult {
   verified: boolean;
-  holderDID?: string;
-  issuerDID?: string;
-  credId?: string;
-  verifiedAt: Date;
+  holder_did?: string;
+  issuer_did?: string;
+  cred_id?: string;
+  verified_at: string;
   checks: {
-    proofValid: boolean;
-    issuerAllowed: boolean;
-    typeMatches: boolean;
-    notRevoked: boolean;
-    notExpired: boolean;
-    constraintsSatisfied: boolean;
+    proof_valid: boolean;
+    issuer_allowed: boolean;
+    type_matches: boolean;
+    not_revoked: boolean;
+    not_expired: boolean;
+    constraints_satisfied: boolean;
   };
-  disclosedAttributes?: Record<string, unknown>;
-  failureReason?: string;
+  disclosed_attributes?: Record<string, unknown>;
+  failure_reason?: string;
   errors?: string[];
 }
 
@@ -408,14 +408,14 @@ export default function EmployerPortal() {
                           <div>
                             <span className="font-semibold">Holder DID:</span>{' '}
                             <code className="text-xs bg-white px-2 py-1 rounded">
-                              {verifyResult.holderDID?.substring(0, 30)}...
+                              {verifyResult.holder_did?.substring(0, 30)}...
                             </code>
                           </div>
-                          {verifyResult.disclosedAttributes && (
+                          {verifyResult.disclosed_attributes && (
                             <div>
                               <span className="font-semibold">Verified Information:</span>
                               <ul className="mt-2 space-y-1 ml-4">
-                                {Object.entries(verifyResult.disclosedAttributes).map(([key, value]) => (
+                                {Object.entries(verifyResult.disclosed_attributes).map(([key, value]) => (
                                   <li key={key}>
                                     <span className="font-medium">{key}:</span> {String(value)}
                                   </li>
@@ -427,7 +427,7 @@ export default function EmployerPortal() {
                       )}
                       {!verifyResult.verified && (
                         <p className="text-red-300">
-                          {verifyResult.failureReason || 'Verification failed'}
+                          {verifyResult.failure_reason || 'Verification failed'}
                         </p>
                       )}
                       <button

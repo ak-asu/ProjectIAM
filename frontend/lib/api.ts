@@ -6,15 +6,14 @@ interface ApiError {
 
 export interface IssuanceResult {
   success: boolean;
-  credId?: string;
-  txHash?: string;
-  merkleRoot?: string;
-  ipfsCID?: string;
+  cred_id?: string;
+  tx_hash?: string;
+  merkle_root?: string;
+  ipfs_cid?: string;
   error?: string;
-  offerQRData?: {
-    qrCodeUrl: string;
-    qrCodeImg?: string;
-    offerUrl: string;
+  offer_qr_data?: {
+    qr_code_url: string;
+    offer_url: string;
   };
 }
 
@@ -24,11 +23,11 @@ export interface AuthStartResult {
 }
 
 export interface AuthStatus {
-  didVerified: boolean;
-  studentLinked: boolean;
+  did_verified: boolean;
+  student_linked: boolean;
   did?: string;
-  studentId?: string;
-  expiresAt: Date;
+  student_id?: string;
+  expires_at: string;
 }
 
 export interface LinkStudentResult {
