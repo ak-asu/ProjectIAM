@@ -1,4 +1,4 @@
-import { IIssuerService } from '../interfaces/IIssuerService';
+import { IIssuerService } from '../interfaces/IssuerInterface';
 import {
   getSupabaseClient,
   Tables,
@@ -72,6 +72,8 @@ export class IssuerService implements IIssuerService {
   async issueCred(request: PrepareCredentialRequest) {
     try {
       const prepared = await this.prepareCred(request);
+      const issuerDID = config.issuerDID;
+      const schemaUrl = config.schemaUrl;
       const cred_id = generateCredentialId();
       const issuanceDate = new Date().toISOString();
       const expirationDate = request.expiration_date
@@ -84,7 +86,7 @@ export class IssuerService implements IIssuerService {
         ],
         id: `urn:uuid:${cred_id}`,
         type: ['VerifiableCredential', request.credential_type || 'DegreeCredential'],
-        issuer: config.issuerDID,
+        issuer: issuerDID,
         issuanceDate,
         expirationDate,
         credentialSubject: prepared.credential_subject,
@@ -94,7 +96,7 @@ export class IssuerService implements IIssuerService {
       const ipfs_cid = await this.ipfs.upload(verifiableCredential, true, prepared.holder_did);
       // Call Issuer Node to create merklized credential
       const issuerNodeResponse = await this.callIssuerNode({
-        schema: config.schemaUrl,
+        schema: schemaUrl,
         subjectId: prepared.holder_did,
         type: verifiableCredential.type,
         credentialSubject: prepared.credential_subject,
@@ -123,14 +125,15 @@ export class IssuerService implements IIssuerService {
           tx_hash: blockchainResult.txHash,
           holder_did: prepared.holder_did,
           student_id: prepared.student_id,
-          issuer_did: config.issuerDID,
+          issuer_did: issuerDID,
           credential_type: request.credential_type || 'DegreeCredential',
-          schema_url: config.schemaUrl,
+          schema_url: schemaUrl,
           ipfs_cid: ipfs_cid,
           revocation_nonce: issuerNodeResponse.credential?.proof?.revocationNonce || 0,
           issued_at: new Date().toISOString(),
           expires_at: request.expiration_date?.toISOString() || null,
           is_revoked: false,
+          issued_by: 'System',
         });
       if (insertError) {
         throw new Error(`Database insert failed: ${insertError.message}`);
@@ -141,7 +144,7 @@ export class IssuerService implements IIssuerService {
           event_type: 'CREDENTIAL_ISSUED',
           entity_type: 'CREDENTIAL',
           entity_id: cred_id,
-          actor: config.issuerDID,
+          actor: issuerDID,
           actor_type: 'ISSUER',
           details: {
             holder_did: prepared.holder_did,

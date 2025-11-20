@@ -74,33 +74,33 @@ export default function StudentPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-linear-to-br from-gray-900 to-gray-800">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <Link href="/" className="text-blue-600 dark:text-blue-400 hover:underline">
+          <Link href="/" className="text-blue-400 hover:underline">
             Home
           </Link>
         </div>
         <div className="max-w-4xl mx-auto">
           <header className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            <h1 className="text-4xl font-bold text-white mb-2">
               Student Portal
             </h1>
-            <p className="text-gray-600 dark:text-gray-300">
+            <p className="text-gray-300">
               Authenticate with Privado ID to access credentials
             </p>
           </header>
           {error && (
-            <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-200 px-4 py-3 rounded mb-4">
+            <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded mb-4">
               {error}
             </div>
           )}
           {!sessionId && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            <div className="bg-gray-800 rounded-lg shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-white mb-4">
                 Get Started
               </h2>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
+              <p className="text-gray-300 mb-6">
                 Start authentication with your Privado ID wallet
               </p>
               <button
@@ -113,30 +113,30 @@ export default function StudentPortal() {
             </div>
           )}
           {qrCodeUrl && !authStatus?.didVerified && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            <div className="bg-gray-800 rounded-lg shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-white mb-4">
                 Scan QR Code
               </h2>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
+              <p className="text-gray-300 mb-6">
                 Scan with your Privado ID app to authenticate
               </p>
               <div className="bg-white p-8 rounded-lg flex justify-center">
                 <QRCodeSVG value={qrCodeUrl} size={256} level="M" />
               </div>
-              <p className="mt-4 text-sm text-gray-500">Waiting...</p>
+              <p className="mt-4 text-sm text-gray-400">Waiting...</p>
             </div>
           )}
           {showLinking && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            <div className="bg-gray-800 rounded-lg shadow-lg p-8">
+              <h2 className="text-2xl font-bold text-white mb-4">
                 Link Your Account
               </h2>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
+              <p className="text-gray-300 mb-6">
                 Enter university credentials to connect your DID
               </p>
               <form onSubmit={handleLinking} className="space-y-4">
                 <div>
-                  <label className="block text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-gray-300 mb-2">
                     Student ID or Email
                   </label>
                   <input
@@ -145,12 +145,12 @@ export default function StudentPortal() {
                     onChange={(e) =>
                       setLinkForm({ ...linkForm, username: e.target.value })
                     }
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-gray-300 mb-2">
                     Password
                   </label>
                   <input
@@ -159,7 +159,7 @@ export default function StudentPortal() {
                     onChange={(e) =>
                       setLinkForm({ ...linkForm, password: e.target.value })
                     }
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                     required
                   />
                 </div>
@@ -174,17 +174,17 @@ export default function StudentPortal() {
             </div>
           )}
           {authStatus?.studentLinked && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+            <div className="bg-gray-800 rounded-lg shadow-lg p-8">
               <h2 className="text-2xl font-bold text-green-600 mb-4">
                 Authentication Successful
               </h2>
               <div className="space-y-4">
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                <div className="border-t border-gray-700 pt-4">
+                  <h3 className="text-lg font-semibold text-white mb-4">
                     Your Credentials
                   </h3>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <p className="text-sm text-gray-400">
                       No credentials yet. Contact your university to get started.
                     </p>
                   </div>

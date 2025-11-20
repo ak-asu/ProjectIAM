@@ -1,4 +1,4 @@
-import { IAuthService } from '../interfaces/IAuthService';
+import { IAuthService } from '../interfaces/AuthInterface';
 import {
   getSupabaseClient,
   Tables,
@@ -8,13 +8,35 @@ import {
   AuthQRData,
   StudentLinkingRequest,
 } from '../helpers/db';
-import { generateNonce, generateSessionId, getFutureTimestamp, timestampToDate } from '../helpers/crypto';
+import { generateNonce, generateSessionId, getFutureTimestamp, timestampToDate, generatePortalToken } from '../helpers/crypto';
 import { generateAuthQR, createAuthRequest, validateIden3commResp, extractDIDFromResp } from '../helpers/qr';
 import * as bcrypt from 'bcrypt';
 import { config } from '../config';
 
+interface PortalSession {
+  userId: string;
+  email: string;
+  name: string;
+  role: string;
+  expiresAt: number;
+}
+
 export class AuthService implements IAuthService {
   private db = getSupabaseClient();
+  private portalSessions: Map<string, PortalSession> = new Map();
+
+  constructor() {
+    setInterval(() => this.cleanupExpiredPortalSessions(), 60 * 60 * 1000);
+  }
+
+  private cleanupExpiredPortalSessions() {
+    const now = Date.now();
+    for (const [token, session] of this.portalSessions.entries()) {
+      if (session.expiresAt < now) {
+        this.portalSessions.delete(token);
+      }
+    }
+  }
 
   async startAuthSession() {
     const session_id = generateSessionId();
@@ -302,5 +324,62 @@ export class AuthService implements IAuthService {
       return 0;
     }
     return data?.length || 0;
+  }
+
+  async portalLogin(email: string, password: string) {
+    try {
+      const { data: user, error } = await this.db
+        .from(Tables.USERS)
+        .select('*')
+        .eq('email', email)
+        .eq('role', 'employer')
+        .single();
+      if (error || !user || !user.password_hash || !(await bcrypt.compare(password, user.password_hash))) {
+        return { success: false, error: 'Invalid email or password' };
+      }
+      const token = generatePortalToken();
+      const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+      this.portalSessions.set(token, {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        expiresAt,
+      });
+      return {
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+        expiresAt: new Date(expiresAt).toISOString(),
+      };
+    } catch (error: any) {
+      console.error('Portal login error:', error);
+      return { success: false, error: 'Login failed' };
+    }
+  }
+
+  async validatePortalToken(token: string) {
+    const session = this.portalSessions.get(token);
+    if (!session) {
+      return null;
+    } else if (session.expiresAt < Date.now()) {
+      this.portalSessions.delete(token);
+      return null;
+    }
+    return {
+      userId: session.userId,
+      email: session.email,
+      name: session.name,
+      role: session.role,
+    };
+  }
+
+  removePortalToken(token: string) {
+    this.portalSessions.delete(token);
   }
 }

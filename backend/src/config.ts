@@ -22,6 +22,7 @@ export const config = {
   pinataSecretKey: process.env.PINATA_SECRET_KEY || '',
   schemaUrl: process.env.SCHEMA_URL || 'ipfs://QmDegreeCredentialSchema',
   encryptionSecret: process.env.ENCRYPTION_SECRET || '',
+  adminApiKey: process.env.ADMIN_API_KEY || '',
   corsOrigin: process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
     : ['*']

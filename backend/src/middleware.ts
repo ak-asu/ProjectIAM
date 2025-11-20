@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
-  console.error('Error:', err);
+  console.error('Error:', JSON.stringify(err));
   const status = (err as any).status || 500;
   const message = err.message || 'Internal server error';
   res.status(status).json({
@@ -12,10 +12,17 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
 }
 
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
-  const start = Date.now();
+  console.log(`Path: ${req.path}`);
+  console.log(`Query:`, req.query);
+  if (req.method === 'POST' || req.method === 'PUT') {
+    if (typeof req.body === 'string') {
+      console.log(`Body (first 200 chars): ${req.body.substring(0, 200)}...`);
+    } else {
+      console.log(`Body:`, JSON.stringify(req.body, null, 2).substring(0, 500));
+    }
+  }
   res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(`${req.method} ${req.path} ${res.statusCode} - ${duration}ms`);
+    console.log(`Response: ${JSON.stringify(res.statusCode)}`);
   });
   next();
 }

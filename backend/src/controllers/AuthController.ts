@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/AuthService';
 import { decodePrivadoJWT } from '../helpers/qr';
+import { config } from '../config';
 
 export class AuthController {
   private authService: AuthService;
@@ -118,4 +119,100 @@ export class AuthController {
       });
     }
   };
+
+  portalLogin = async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ success: false, error: 'Email and password required' });
+      }
+      const result = await this.authService.portalLogin(email, password);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      res.status(500).json({ success: false, error: 'Login failed' });
+    }
+  };
+
+  portalLogout = async (req: Request, res: Response) => {
+    try {
+      const token = req.headers['authorization']?.replace('Bearer ', '');
+      if (token) {
+        this.authService.removePortalToken(token);
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: 'Logout failed' });
+    }
+  };
+
+  verifyPortalToken = async (req: Request, res: Response) => {
+    try {
+      const token = req.headers['authorization']?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({ success: false, error: 'No token provided' });
+      }
+      const session = await this.authService.validatePortalToken(token);
+      if (!session) {
+        return res.status(401).json({ success: false, error: 'Invalid or expired token' });
+      }
+      res.json({
+        success: true,
+        user: {
+          id: session.userId,
+          email: session.email,
+          name: session.name,
+          role: session.role,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: 'Verification failed' });
+    }
+  };
+
+  requireEmployerAuth = async (req: Request, res: Response, next: Function) => {
+    const session = await this.validateSession(req, res);
+    if (!session) return;
+    if (session.role !== 'employer') {
+      return res.status(403).json({ success: false, error: 'Employer access required' });
+    }
+    (req as any).user = this.sessionToUser(session);
+    next();
+  };
+
+  requireAdminAuth = async (req: Request, res: Response, next: Function) => {
+    const apiKey = req.headers['X-Admin-Key'];
+    if (!apiKey || apiKey !== config.adminApiKey) {
+      return res.status(401).json({ success: false, error: 'Invalid or missing admin API key' });
+    }
+    next();
+  };
+
+  private async validateSession(req: Request, res: Response) {
+    try {
+      const token = req.headers['authorization']?.replace('Bearer ', '');
+      if (!token) {
+        res.status(401).json({ success: false, error: 'Login required' });
+        return null;
+      }
+      const session = await this.authService.validatePortalToken(token);
+      if (!session) {
+        res.status(401).json({ success: false, error: 'Session expired' });
+        return null;
+      }
+      return session;
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: 'Authentication failed' });
+      return null;
+    }
+  }
+
+  private sessionToUser(session: { userId: string; email: string; name: string; role: string }) {
+    return {
+      id: session.userId,
+      email: session.email,
+      name: session.name,
+      role: session.role,
+    };
+  }
 }

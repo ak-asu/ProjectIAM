@@ -1,4 +1,4 @@
-import { IVerifierService } from '../interfaces/IVerifierService';
+import { IVerifierService } from '../interfaces/VerifierInterface';
 import {
   getSupabaseClient,
   Tables,

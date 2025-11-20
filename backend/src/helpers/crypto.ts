@@ -20,6 +20,10 @@ export function generateCredentialId() {
   return `cred-${Date.now()}-${randomBytes(8).toString('hex')}`;
 }
 
+export function generatePortalToken() {
+  return randomBytes(32).toString('hex');
+}
+
 export function extractDIDMethod(did: string) {
   const parts = did.split(':');
   return parts.length >= 2 ? parts[1] : null;

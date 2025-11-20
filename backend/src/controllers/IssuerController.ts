@@ -60,19 +60,17 @@ export class IssuerController {
 
   revokeCred = async (req: Request, res: Response) => {
     try {
-      const { credId, reason, revokedBy } = req.body;
+      const { credId, reason } = req.body;
+      const user = (req as any).user;      
       if (!credId || !reason) {
         res.status(400).json({
           success: false,
           error: 'Credential ID and reason required',
         });
         return;
-      }
-      const result = await this.issuerService.revokeCredential(
-        credId,
-        reason,
-        revokedBy || 'admin'
-      );
+      }      
+      const revokedBy = user?.email || 'admin';
+      const result = await this.issuerService.revokeCredential(credId, reason, revokedBy);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({

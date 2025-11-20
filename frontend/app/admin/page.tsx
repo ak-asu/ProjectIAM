@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '../../lib/api';
 
 export default function AdminPortal() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [apiKeyForm, setApiKeyForm] = useState('');
   const [activeTab, setActiveTab] = useState<'issue' | 'manage'>('issue');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -20,6 +22,44 @@ export default function AdminPortal() {
     honors: '',
   });
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const result = await api.verifyAdminKey();
+        setIsAuthenticated(result.success);
+      } catch {
+        setIsAuthenticated(false);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      api.setAdminKey(apiKeyForm);
+      const result = await api.verifyAdminKey();
+      if (result.success) {
+        setIsAuthenticated(true);
+      } else {
+        setError(result.error || 'Invalid API key');
+        api.clearAdminKey();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Authentication failed');
+      api.clearAdminKey();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    api.clearAdminKey();
+    setIsAuthenticated(false);
+    setApiKeyForm('');
+  };
 
   const handleIssueCredential = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,32 +103,91 @@ export default function AdminPortal() {
     }
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-gray-900 to-gray-800">
+        <div className="container mx-auto px-4 py-8">
+          <div className="mb-8">
+            <Link href="/" className="text-purple-400 hover:underline">
+              Home
+            </Link>
+          </div>
+          <div className="max-w-md mx-auto">
+            <header className="text-center mb-8">
+              <h1 className="text-4xl font-bold text-white mb-2">
+                University Admin Portal
+              </h1>
+              <p className="text-gray-300">
+                Enter your API key to access the admin portal
+              </p>
+            </header>
+            <div className="bg-gray-800 rounded-lg shadow-lg p-8">
+              {error && (
+                <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded mb-4">
+                  {error}
+                </div>
+              )}
+              <form onSubmit={handleLogin} className="space-y-6">
+                <div>
+                  <label className="block text-gray-300 mb-2 font-semibold">
+                    Admin API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={apiKeyForm}
+                    onChange={(e) => setApiKeyForm(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
+                    required
+                    placeholder="Enter your admin API key"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50"
+                >
+                  {loading ? 'Authenticating...' : 'Login'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-linear-to-br from-purple-50 to-pink-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-linear-to-br from-gray-900 to-gray-800">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <Link href="/" className="text-purple-600 dark:text-purple-400 hover:underline">
+        <div className="mb-8 flex justify-between items-center">
+          <Link href="/" className="text-purple-400 hover:underline">
             Home
           </Link>
+          <button
+            onClick={handleLogout}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+          >
+            Logout
+          </button>
         </div>
         <div className="max-w-6xl mx-auto">
           <header className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            <h1 className="text-4xl font-bold text-white mb-2">
               University Admin Portal
             </h1>
-            <p className="text-gray-600 dark:text-gray-300">
+            <p className="text-gray-300">
               Issue and manage student credentials
             </p>
           </header>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-            <div className="border-b border-gray-200 dark:border-gray-700">
+          <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+            <div className="border-b border-gray-700">
               <div className="flex">
                 <button
                   onClick={() => setActiveTab('issue')}
                   className={`flex-1 px-6 py-4 font-semibold ${
                     activeTab === 'issue'
                       ? 'bg-purple-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      : 'bg-gray-700 text-gray-300'
                   }`}
                 >
                   Issue Credential
@@ -98,7 +197,7 @@ export default function AdminPortal() {
                   className={`flex-1 px-6 py-4 font-semibold ${
                     activeTab === 'manage'
                       ? 'bg-purple-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      : 'bg-gray-700 text-gray-300'
                   }`}
                 >
                   Manage Credentials
@@ -107,24 +206,24 @@ export default function AdminPortal() {
             </div>
             <div className="p-8">
               {error && (
-                <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-200 px-4 py-3 rounded mb-4">
+                <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded mb-4">
                   {error}
                 </div>
               )}
               {success && (
-                <div className="bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-700 text-green-800 dark:text-green-200 px-4 py-3 rounded mb-4">
+                <div className="bg-green-900 border border-green-700 text-green-200 px-4 py-3 rounded mb-4">
                   {success}
                 </div>
               )}
               {activeTab === 'issue' && (
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                  <h2 className="text-2xl font-bold text-white mb-6">
                     Issue New Credential
                   </h2>
                   <form onSubmit={handleIssueCredential} className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                        <label className="block text-gray-300 mb-2 font-semibold">
                           Student ID
                         </label>
                         <input
@@ -133,13 +232,13 @@ export default function AdminPortal() {
                           onChange={(e) =>
                             setCredForm({ ...credForm, studentId: e.target.value })
                           }
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                           required
                           placeholder="STU123456"
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                        <label className="block text-gray-300 mb-2 font-semibold">
                           University
                         </label>
                         <input
@@ -148,12 +247,12 @@ export default function AdminPortal() {
                           onChange={(e) =>
                             setCredForm({ ...credForm, university: e.target.value })
                           }
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                        <label className="block text-gray-300 mb-2 font-semibold">
                           Degree
                         </label>
                         <select
@@ -161,7 +260,7 @@ export default function AdminPortal() {
                           onChange={(e) =>
                             setCredForm({ ...credForm, degree: e.target.value })
                           }
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                           required
                         >
                           <option>Bachelor of Science</option>
@@ -172,7 +271,7 @@ export default function AdminPortal() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                        <label className="block text-gray-300 mb-2 font-semibold">
                           Major
                         </label>
                         <input
@@ -181,12 +280,12 @@ export default function AdminPortal() {
                           onChange={(e) =>
                             setCredForm({ ...credForm, major: e.target.value })
                           }
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                        <label className="block text-gray-300 mb-2 font-semibold">
                           Graduation Year
                         </label>
                         <input
@@ -198,14 +297,14 @@ export default function AdminPortal() {
                               graduationYear: parseInt(e.target.value),
                             })
                           }
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                           required
                           min="1900"
                           max={new Date().getFullYear() + 10}
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                        <label className="block text-gray-300 mb-2 font-semibold">
                           GPA
                         </label>
                         <input
@@ -215,14 +314,14 @@ export default function AdminPortal() {
                           onChange={(e) =>
                             setCredForm({ ...credForm, gpa: e.target.value })
                           }
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                           placeholder="3.75"
                           min="0"
                           max="4"
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-gray-700 dark:text-gray-300 mb-2 font-semibold">
+                        <label className="block text-gray-300 mb-2 font-semibold">
                           Honors
                         </label>
                         <input
@@ -231,7 +330,7 @@ export default function AdminPortal() {
                           onChange={(e) =>
                             setCredForm({ ...credForm, honors: e.target.value })
                           }
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
                           placeholder="Summa Cum Laude"
                         />
                       </div>
@@ -245,11 +344,11 @@ export default function AdminPortal() {
                     </button>
                   </form>
                   {offerQR && (
-                    <div className="mt-8 p-6 bg-green-50 dark:bg-green-900 rounded-lg">
-                      <h3 className="text-lg font-bold text-green-800 dark:text-green-200 mb-4">
+                    <div className="mt-8 p-6 bg-green-900 rounded-lg">
+                      <h3 className="text-lg font-bold text-green-200 mb-4">
                         Credential Issued
                       </h3>
-                      <p className="text-sm text-green-700 dark:text-green-300 mb-4">
+                      <p className="text-sm text-green-300 mb-4">
                         Student scans QR with Privado ID to claim credential
                       </p>
                       <div className="bg-white p-4 rounded inline-block">
@@ -266,11 +365,11 @@ export default function AdminPortal() {
               )}
               {activeTab === 'manage' && (
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                  <h2 className="text-2xl font-bold text-white mb-6">
                     Manage Issued Credentials
                   </h2>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-                    <p className="text-gray-600 dark:text-gray-300">
+                  <div className="bg-gray-700 rounded-lg p-6">
+                    <p className="text-gray-300">
                       No credentials found. Issue your first credential to see it here.
                     </p>
                   </div>
