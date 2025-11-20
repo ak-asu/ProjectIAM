@@ -171,11 +171,18 @@ export class AuthService implements IAuthService {
         .single();
       let student_linked = false;
       if (!bindingError && binding) {
-        await this.db
+        console.log(`Found existing binding for DID ${holderDID}`);
+        const { error: linkError } = await this.db
           .from(Tables.SESSIONS)
           .update({ student_id: binding.student_id })
           .eq('id', session_id);
-        student_linked = true;
+        if (linkError) {
+          console.error('Failed to update session with student_id:', linkError);
+        } else {
+          student_linked = true;
+        }
+      } else {
+        console.log(`No existing binding found for DID ${holderDID}`);
       }
       return {
         success: true,

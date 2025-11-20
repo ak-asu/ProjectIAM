@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
 import { api, type AuthStatus } from '../../lib/api';
@@ -9,10 +9,29 @@ export default function StudentPortal() {
   const [sessionId, setSessionId] = useState<string>('');
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showLinking, setShowLinking] = useState(false);
   const [linkForm, setLinkForm] = useState({ username: '', password: '' });
+
+  useEffect(() => {
+    const savedSessionId = localStorage.getItem('student_session_id');
+    if (savedSessionId) {
+      api.getAuthStatus(savedSessionId).then((status) => {
+        const expiresAt = new Date(status.expires_at);
+        if (expiresAt > new Date()) {
+          setSessionId(savedSessionId);
+          setAuthStatus(status);
+          if (status.did_verified && !status.student_linked) {
+            setShowLinking(true);
+          }
+        } else {
+          localStorage.removeItem('student_session_id');
+        }
+      }).catch(() => { localStorage.removeItem('student_session_id'); })
+        .finally(() => setLoading(false));
+    }
+  }, []);
 
   const startAuthentication = async () => {
     try {
@@ -21,6 +40,7 @@ export default function StudentPortal() {
       const result = await api.startAuth();
       setSessionId(result.sessionId);
       setQrCodeUrl(result.qrCodeUrl);
+      localStorage.setItem('student_session_id', result.sessionId);
       pollAuthStatus(result.sessionId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
@@ -36,14 +56,17 @@ export default function StudentPortal() {
         setAuthStatus(status);
         if (status.did_verified && !status.student_linked) {
           setShowLinking(true);
+          setQrCodeUrl('');
           clearInterval(interval);
         } else if (status.student_linked) {
+          setShowLinking(false);
+          setQrCodeUrl('');
           clearInterval(interval);
         }
       } catch (err) {
         console.error('Poll error:', err);
       }
-    }, 4000);
+    }, 3000);
     setTimeout(() => clearInterval(interval), 320000);
   };
 
@@ -73,29 +96,63 @@ export default function StudentPortal() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('student_session_id');
+    setSessionId('');
+    setQrCodeUrl('');
+    setAuthStatus(null);
+    setShowLinking(false);
+    setError('');
+  };
+
+  if (loading && !sessionId) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-gray-900 to-gray-800">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto text-center">
+            <p className="text-gray-300">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const showStartButton = !sessionId || (!authStatus?.did_verified && !qrCodeUrl && !showLinking);
+  const showQRCode = qrCodeUrl && !authStatus?.did_verified;
+  const showLinkingForm = showLinking && !authStatus?.student_linked;
+  const showDashboard = authStatus?.student_linked;
+
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-900 to-gray-800">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
+        <div className="mb-8 flex justify-between items-center">
           <Link href="/" className="text-blue-400 hover:underline">
             Home
           </Link>
+          {authStatus?.student_linked && (
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+            >
+              Logout
+            </button>
+          )}
         </div>
         <div className="max-w-4xl mx-auto">
           <header className="text-center mb-8">
             <h1 className="text-4xl font-bold text-white mb-2">
               Student Portal
             </h1>
-            <p className="text-gray-300">
+            {!showDashboard && <p className="text-gray-300">
               Authenticate with Privado ID to access credentials
-            </p>
+            </p>}
           </header>
           {error && (
             <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded mb-4">
               {error}
             </div>
           )}
-          {!sessionId && (
+          {showStartButton && (
             <div className="bg-gray-800 rounded-lg shadow-lg p-8">
               <h2 className="text-2xl font-bold text-white mb-4">
                 Get Started
@@ -112,7 +169,7 @@ export default function StudentPortal() {
               </button>
             </div>
           )}
-          {qrCodeUrl && !authStatus?.did_verified && (
+          {showQRCode && (
             <div className="bg-gray-800 rounded-lg shadow-lg p-8">
               <h2 className="text-2xl font-bold text-white mb-4">
                 Scan QR Code
@@ -123,16 +180,16 @@ export default function StudentPortal() {
               <div className="bg-white p-8 rounded-lg flex justify-center">
                 <QRCodeSVG value={qrCodeUrl} size={256} level="M" />
               </div>
-              <p className="mt-4 text-sm text-gray-400">Waiting...</p>
+              <p className="mt-4 text-sm text-gray-400 text-center">Waiting...</p>
             </div>
           )}
-          {showLinking && (
+          {showLinkingForm && (
             <div className="bg-gray-800 rounded-lg shadow-lg p-8">
               <h2 className="text-2xl font-bold text-white mb-4">
                 Link Your Account
               </h2>
               <p className="text-gray-300 mb-6">
-                Enter university credentials to connect your DID
+                Enter your university credentials.
               </p>
               <form onSubmit={handleLinking} className="space-y-4">
                 <div>
@@ -173,21 +230,16 @@ export default function StudentPortal() {
               </form>
             </div>
           )}
-          {authStatus?.student_linked && (
-            <div className="bg-gray-800 rounded-lg shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-green-600 mb-4">
-                Authentication Successful
-              </h2>
-              <div className="space-y-4">
-                <div className="border-t border-gray-700 pt-4">
-                  <h3 className="text-lg font-semibold text-white mb-4">
-                    Your Credentials
-                  </h3>
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <p className="text-sm text-gray-400">
-                      No credentials yet. Contact your university to get started.
-                    </p>
-                  </div>
+          {showDashboard && (
+            <div className="space-y-6">
+              <div className="bg-gray-800 rounded-lg shadow-lg p-8">
+                <h3 className="text-xl font-semibold text-white mb-4">
+                  Your Credentials
+                </h3>
+                <div className="bg-gray-700 rounded-lg p-4">
+                  <p className="text-sm text-gray-400">
+                    No credentials yet.
+                  </p>
                 </div>
               </div>
             </div>
