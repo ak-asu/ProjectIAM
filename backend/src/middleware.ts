@@ -13,7 +13,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
 
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
   console.log(`Path: ${req.path}`);
-  console.log(`Query:`, req.query);
+  console.log(`Query:`, JSON.stringify(req.query));
   if (req.method === 'POST' || req.method === 'PUT') {
     if (typeof req.body === 'string') {
       console.log(`Body (first 200 chars): ${req.body.substring(0, 200)}...`);

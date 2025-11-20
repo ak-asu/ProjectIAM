@@ -8,7 +8,7 @@ import {
   AuthQRData,
   StudentLinkingRequest,
 } from '../helpers/db';
-import { generateNonce, generateSessionId, getFutureTimestamp, timestampToDate, generatePortalToken } from '../helpers/crypto';
+import { generateNonce, generateId, getFutureTimestamp, timestampToDate, generatePortalToken } from '../helpers/crypto';
 import { generateAuthQR, createAuthRequest, validateIden3commResp, extractDIDFromResp } from '../helpers/qr';
 import * as bcrypt from 'bcrypt';
 import { config } from '../config';
@@ -39,7 +39,7 @@ export class AuthService implements IAuthService {
   }
 
   async startAuthSession() {
-    const session_id = generateSessionId();
+    const session_id = generateId();
     const nonce = generateNonce();
     const expires_at = timestampToDate(getFutureTimestamp(config.sessionTTLMin));
     const { data: dbSession, error } = await this.db

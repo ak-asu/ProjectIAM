@@ -10,8 +10,8 @@ import {
   VerificationQRData,
 } from '../helpers/db';
 import { getBlockchainService } from '../helpers/blockchain';
-import { generateVerifyId, getFutureTimestamp, timestampToDate } from '../helpers/crypto';
-import { generateProofRequestQR, createProofRequest, validateIden3commResp } from '../helpers/qr';
+import { generateId, getFutureTimestamp, timestampToDate } from '../helpers/crypto';
+import { generateProofRequestQR, createProofRequest } from '../helpers/qr';
 import {
   ZKProof,
   verifyIssuerAuth,
@@ -25,7 +25,7 @@ export class VerifierService implements IVerifierService {
   private blockchain = getBlockchainService();
 
   async createVerifySession(policy: VerificationPolicy, verifier_id?: string) {
-    const verify_id = generateVerifyId();
+    const verify_id = generateId();
     const expires_at = timestampToDate(getFutureTimestamp(config.verifySessionTTLMin));
     const callback_url = `${config.backendBaseUrl}/api/verify/callback?verifyId=${verify_id}`;
     const proof_request = await this.buildProofRequest(policy, callback_url);

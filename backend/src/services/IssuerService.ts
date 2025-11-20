@@ -11,7 +11,7 @@ import {
 import { getBlockchainService } from '../helpers/blockchain';
 import { getIPFSService } from '../helpers/ipfs';
 import { generateOfferQR, createCredOffer } from '../helpers/qr';
-import { generateCredentialId, dateToTimestamp } from '../helpers/crypto';
+import { generateId, dateToTimestamp } from '../helpers/crypto';
 import { ethers } from 'ethers';
 import { config } from '../config';
 
@@ -74,7 +74,7 @@ export class IssuerService implements IIssuerService {
       const prepared = await this.prepareCred(request);
       const issuerDID = config.issuerDID;
       const schemaUrl = config.schemaUrl;
-      const cred_id = generateCredentialId();
+      const cred_id = generateId();
       const issuanceDate = new Date().toISOString();
       const expirationDate = request.expiration_date
         ? request.expiration_date.toISOString()

@@ -1,23 +1,15 @@
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes, createHash, randomUUID } from 'crypto';
 
 export function generateNonce(length = 32) {
   return randomBytes(length).toString('hex');
 }
 
-export function generateSessionId() {
-  return randomBytes(16).toString('hex');
+export function generateId() {
+  return randomUUID(); // UUID v4 format for PostgreSQL compatibility
 }
 
 export function sha256(data: string) {
   return createHash('sha256').update(data).digest('hex');
-}
-
-export function generateVerifyId() {
-  return `verify-${Date.now()}-${randomBytes(8).toString('hex')}`;
-}
-
-export function generateCredentialId() {
-  return `cred-${Date.now()}-${randomBytes(8).toString('hex')}`;
 }
 
 export function generatePortalToken() {
