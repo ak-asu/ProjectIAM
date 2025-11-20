@@ -46,6 +46,8 @@ export default function EmployerPortal() {
           setIsAuthenticated(true);
           setUserInfo(result.user);
         }
+      }).catch(() => {
+        setIsAuthenticated(false);
       });
     } catch (err) {
       setIsAuthenticated(false);

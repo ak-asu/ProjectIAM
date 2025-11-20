@@ -114,6 +114,13 @@ VALUES
     ('STU008', 'Lisa Rodriguez', 'lisa.rodriguez@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
     ('STU009', 'Robert Lee', 'robert.lee@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
     ('STU010', 'Maria Hernandez', 'maria.hernandez@asu.edu', '$2b$10$fS84EYZ7bQGC2IlghjZuHO6lPZBwMrPridsWqpnAoFNhHDAZ.LPxK', 'student'),
-    ('EMP001', 'TechCorp HR', 'hr@techcorp.com', '$2b$10$Pi5fH8E8PMMcubik7vY1xO4Sn/afQFAnK1av0lZOJqLmBbKQuEtgW', 'employer'), -- Password: Employer123!
-    ('EMP002', 'Global Solutions Recruiter', 'recruiter@globalsolutions.com', '$2b$10$Pi5fH8E8PMMcubik7vY1xO4Sn/afQFAnK1av0lZOJqLmBbKQuEtgW', 'employer')
+    ('EMP001', 'TechCorp HR', 'hr@techcorp.com', '$2b$10$4fSYrDFbIx8.IM3r1QANP.KMZonWKJtlgtaJ7BZrBxJg3wfTvERuW', 'employer'), -- Password: Employer123!
+    ('EMP002', 'Global Solutions', 'recruiter@globalsolutions.com', '$2b$10$4fSYrDFbIx8.IM3r1QANP.KMZonWKJtlgtaJ7BZrBxJg3wfTvERuW', 'employer')
 ON CONFLICT (student_id) DO NOTHING;
+
+GRANT ALL ON TABLE sessions TO service_role;
+GRANT ALL ON TABLE verification_sessions TO service_role;
+GRANT ALL ON TABLE users TO service_role;
+GRANT ALL ON TABLE did_bindings TO service_role;
+GRANT ALL ON TABLE credential_records TO service_role;
+GRANT ALL ON TABLE audit_logs TO service_role;

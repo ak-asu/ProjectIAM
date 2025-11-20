@@ -181,7 +181,7 @@ export class AuthController {
   };
 
   requireAdminAuth = async (req: Request, res: Response, next: Function) => {
-    const apiKey = req.headers['X-Admin-Key'];
+    const apiKey = req.headers['x-admin-key'];
     if (!apiKey || apiKey !== config.adminApiKey) {
       return res.status(401).json({ success: false, error: 'Invalid or missing admin API key' });
     }
