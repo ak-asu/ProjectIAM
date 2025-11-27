@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../../lib/api';
+import { CredentialRecord } from '../../lib/constants';
 
 export default function AdminPortal() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -21,18 +23,52 @@ export default function AdminPortal() {
     gpa: '',
     honors: '',
   });
+  const [credentials, setCredentials] = useState<CredentialRecord[]>([]);
+  const [revokeModal, setRevokeModal] = useState<{ credId: string; reason: string } | null>(null);
+
+  const loadCredentials = async () => {
+    try {
+      const result = await api.getAllCredentials(100, 0) as { credentials: CredentialRecord[]; total: number };
+      setCredentials(result.credentials || []);
+    } catch (err) {
+      console.error('Failed to load credentials:', err);
+    }
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const result = await api.verifyAdminKey();
         setIsAuthenticated(result.success);
+        if (result.success) {
+          loadCredentials();
+        }
       } catch {
         setIsAuthenticated(false);
       }
     };
     checkAuth();
   }, []);
+
+  const handleRevokeCred = async () => {
+    if (!revokeModal) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await api.revokeCredential(revokeModal.credId, revokeModal.reason) as { success: boolean; error?: string };
+      if (result.success) {
+        setSuccess('Credential revoked successfully');
+        setRevokeModal(null);
+        loadCredentials();
+      } else {
+        setError(result.error || 'Revocation failed');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Revocation failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -351,14 +387,12 @@ export default function AdminPortal() {
                       <p className="text-sm text-green-300 mb-4">
                         Student scans QR with Privado ID to claim credential
                       </p>
-                      <div className="bg-white p-4 rounded inline-block">
-                        <div className="text-center">
-                          <div className="text-6xl mb-2">📱</div>
-                          <code className="text-xs bg-gray-100 px-2 py-1 rounded break-all block">
-                            {offerQR}
-                          </code>
-                        </div>
+                      <div className="bg-white p-4 rounded-lg flex justify-center">
+                        <QRCodeSVG value={offerQR} size={200} level="M" />
                       </div>
+                      <p className="text-xs text-green-400 mt-2 text-center break-all">
+                        {offerQR}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -368,10 +402,93 @@ export default function AdminPortal() {
                   <h2 className="text-2xl font-bold text-white mb-6">
                     Manage Issued Credentials
                   </h2>
-                  <div className="bg-gray-700 rounded-lg p-6">
-                    <p className="text-gray-300">
-                      No credentials found. Issue your first credential to see it here.
-                    </p>
+                  {credentials.length === 0 ? (
+                    <div className="bg-gray-700 rounded-lg p-6">
+                      <p className="text-gray-300">
+                        No credentials found.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="bg-gray-700">
+                          <tr>
+                            <th className="px-4 py-3 text-gray-300 font-semibold">Student ID</th>
+                            <th className="px-4 py-3 text-gray-300 font-semibold">Type</th>
+                            <th className="px-4 py-3 text-gray-300 font-semibold">Issued</th>
+                            <th className="px-4 py-3 text-gray-300 font-semibold">Status</th>
+                            <th className="px-4 py-3 text-gray-300 font-semibold">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-700">
+                          {credentials.map((cred) => (
+                            <tr key={cred.id} className="hover:bg-gray-750">
+                              <td className="px-4 py-3 text-gray-300">{cred.student_id}</td>
+                              <td className="px-4 py-3 text-gray-300">{cred.credential_type}</td>
+                              <td className="px-4 py-3 text-gray-400 text-sm">
+                                {new Date(cred.issued_at).toLocaleDateString()}
+                              </td>
+                              <td className="px-4 py-3">
+                                {cred.is_revoked ? (
+                                  <span className="px-2 py-1 text-xs rounded bg-red-900 text-red-200">
+                                    Revoked
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 text-xs rounded bg-green-900 text-green-200">
+                                    Active
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                {!cred.is_revoked && (
+                                  <button
+                                    onClick={() => setRevokeModal({ credId: cred.id, reason: '' })}
+                                    className="text-red-400 hover:text-red-300 text-sm"
+                                  >
+                                    Revoke
+                                  </button>
+                                )}
+                                {cred.is_revoked && cred.revocation_reason && (
+                                  <span className="text-xs text-gray-500" title={cred.revocation_reason}>
+                                    {cred.revocation_reason.substring(0, 20)}...
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+              {revokeModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+                    <h3 className="text-xl font-bold text-white mb-4">Revoke Credential</h3>
+                    <textarea
+                      value={revokeModal.reason}
+                      onChange={(e) => setRevokeModal({ ...revokeModal, reason: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white mb-4"
+                      placeholder="Reason for revocation"
+                      rows={3}
+                      required
+                    />
+                    <div className="flex justify-end gap-3">
+                      <button
+                        onClick={() => setRevokeModal(null)}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleRevokeCred}
+                        disabled={!revokeModal.reason || loading}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50"
+                      >
+                        {loading ? 'Revoking...' : 'Revoke'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

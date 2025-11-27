@@ -112,7 +112,7 @@ export class IssuerController {
   getHolderCreds = async (req: Request, res: Response) => {
     try {
       const { holderDID } = req.params;
-      const credentials = await this.issuerService.getAllCredsByHolder(holderDID);
+      const credentials = await this.issuerService.getAllCredentialsByHolder(holderDID);
       res.json({ credentials });
     } catch (error: any) {
       res.status(500).json({

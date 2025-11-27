@@ -10,7 +10,7 @@ import {
   VerificationQRData,
 } from '../types';
 
-export interface IVerifierService {
+export interface VerifierInterface {
   createVerifySession(policy: VerificationPolicy, verifier_id?: string): Promise<{
     session: VerificationSession;
     qr_data: VerificationQRData;

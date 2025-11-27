@@ -1,4 +1,4 @@
-import { IVerifierService } from '../interfaces/VerifierInterface';
+import { VerifierInterface } from '../interfaces/VerifierInterface';
 import {
   getSupabaseClient,
   Tables,
@@ -15,12 +15,15 @@ import { generateProofRequestQR, createProofRequest } from '../helpers/qr';
 import {
   ZKProof,
   verifyIssuerAuth,
-  checkCredentialOnChain,
+  checkCredOnChain,
   validateProofResp,
+  proofVerification,
+  claimsFromPubSignals,
+  didFromId,
 } from '../helpers/verifier';
 import { config } from '../config';
 
-export class VerifierService implements IVerifierService {
+export class VerifierService implements VerifierInterface {
   private db = getSupabaseClient();
   private blockchain = getBlockchainService();
 
@@ -130,7 +133,7 @@ export class VerifierService implements IVerifierService {
       };
       // Check credential validity on-chain
       if (proofVerification.cred_id) {
-        const validity = await checkCredentialOnChain(proofVerification.cred_id);
+        const validity = await checkCredOnChain(proofVerification.cred_id);
         checks.not_revoked = validity.isValid && !validity.reason.includes('Revoked');
         checks.not_expired = validity.isValid && !validity.reason.includes('expired');
       } else {
@@ -257,88 +260,98 @@ export class VerifierService implements IVerifierService {
   }
 
   async verifyProof(proof_resp: ProofResponse, proof_req: ProofRequest) {
-      const errors: string[] = [];
-      try {
-        if (!proof_resp || !proof_resp.body || !proof_resp.body.scope) {
-          errors.push('Invalid proof response structure');
-          return {
-            verified: false,
-            holder_did: '',
-            issuer_did: '',
-            cred_id: undefined,
-            disclosed_attributes: undefined,
-            errors,
-          };
-        }
-        const holder_did = proof_resp.from || '';
-        if (!holder_did) {
-          errors.push('Holder DID not found in response');
-        }
-        const scopeItem = proof_resp.body.scope[0];
-        if (!scopeItem || !scopeItem.proof) {
-          errors.push('Proof not found in response');
-          return {
-            verified: false,
-            holder_did,
-            issuer_did: '',
-            cred_id: undefined,
-            disclosed_attributes: undefined,
-            errors,
-          };
-        }
-        const proof: ZKProof = scopeItem.proof;
-        if (!proof.pub_signals || !Array.isArray(proof.pub_signals)) {
-          errors.push('Public signals missing or invalid');
-        }
-        if (
-          !proof.proof ||
-          !proof.proof.pi_a ||
-          !proof.proof.pi_b ||
-          !proof.proof.pi_c
-        ) {
-          errors.push('Proof components missing');
-        }
-        if (errors.length > 0) {
-          return {
-            verified: false,
-            holder_did,
-            issuer_did: '',
-            cred_id: undefined,
-            disclosed_attributes: undefined,
-            errors,
-          };
-        }
-        const verified = true;
-        let issuer_did = '';
-        if (scopeItem.vp && scopeItem.vp.verifiableCredential) {
-          const vc = scopeItem.vp.verifiableCredential[0];
-          issuer_did = vc.issuer || '';
-        }
-        const disclosed_attributes: Record<string, any> = {};
-        if (scopeItem.vp && scopeItem.vp.verifiableCredential) {
-          const vc = scopeItem.vp.verifiableCredential[0];
-          if (vc.credentialSubject) {
-            Object.assign(disclosed_attributes, vc.credentialSubject);
-          }
-        }
-        return {
-          verified,
-          holder_did,
-          issuer_did,
-          cred_id: undefined,
-          disclosed_attributes,
-        };
-      } catch (error: any) {
-        errors.push(`Verification error: ${error.message}`);
+    const errors: string[] = [];
+    try {
+      if (!proof_resp || !proof_resp.body || !proof_resp.body.scope) {
         return {
           verified: false,
           holder_did: '',
           issuer_did: '',
           cred_id: undefined,
           disclosed_attributes: undefined,
+          errors: ['Invalid proof response'],
+        };
+      }
+      if (!proof_resp.from) {
+        errors.push('Holder DID not found in response');
+      }
+      const holder_did = proof_resp.from;
+      const scope = proof_resp.body.scope[0];
+      if (!scope || !scope.proof) {
+        errors.push('Proof not found in response');
+        return {
+          verified: false,
+          holder_did,
+          issuer_did: '',
+          cred_id: undefined,
+          disclosed_attributes: undefined,
           errors,
         };
       }
+      const proof: ZKProof = scope.proof;
+      if (!proof.pub_signals || !Array.isArray(proof.pub_signals) || !proof.proof || !proof.proof.pi_a || !proof.proof.pi_b || !proof.proof.pi_c) {
+        errors.push('Proof components missing');
+      }
+      if (errors.length > 0) {
+        return {
+          verified: false,
+          holder_did,
+          issuer_did: '',
+          cred_id: undefined,
+          disclosed_attributes: undefined,
+          errors,
+        };
+      }
+      const zkVerify = await proofVerification(proof);
+      if (!zkVerify.verified) {
+        return {
+          verified: false,
+          holder_did,
+          issuer_did: '',
+          cred_id: undefined,
+          disclosed_attributes: undefined,
+          errors: zkVerify.errors,
+        };
+      }
+      const claims = claimsFromPubSignals(proof.pub_signals);
+      // Derive issuer DID from public signals
+      let issuer_did = '';
+      if (claims.issuerID) {
+        issuer_did = didFromId(claims.issuerID);
+      } else if (scope.vp && scope.vp.verifiableCredential) {
+        const vc = scope.vp.verifiableCredential[0];
+        issuer_did = vc.issuer || '';
+      }
+      // Extract disclosed attributes
+      const disclosed_attributes: Record<string, any> = {};
+      if (scope.vp && scope.vp.verifiableCredential) {
+        const vc = scope.vp.verifiableCredential[0];
+        if (vc.credentialSubject) {
+          Object.assign(disclosed_attributes, vc.credentialSubject);
+        }
+      }
+      // Add all extracted ZK proof claims to disclosed attributes
+      if ((claims.value && claims.value.length > 0) || Object.keys(claims).length > 0) {
+        disclosed_attributes._zkClaims = claims;
+      }
+      return {
+        verified: true,
+        holder_did,
+        issuer_did,
+        cred_id: undefined,
+        disclosed_attributes,
+      };
+    } catch (error: any) {
+      errors.push(`Verification error: ${error.message}`);
+      return {
+        verified: false,
+        holder_did: '',
+        issuer_did: '',
+        cred_id: undefined,
+        disclosed_attributes: undefined,
+        errors,
+      };
+    }
   }
 
   private async updateSessionResult(verify_id: string, status: string, result: VerificationResult) {

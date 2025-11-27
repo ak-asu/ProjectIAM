@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
-import { api, type AuthStatus } from '../../lib/api';
+import { api } from '../../lib/api';
+import { student_session_id, AuthStatus, StudentCredential } from '../../lib/constants';
 
 export default function StudentPortal() {
   const [sessionId, setSessionId] = useState<string>('');
@@ -13,9 +14,19 @@ export default function StudentPortal() {
   const [error, setError] = useState('');
   const [showLinking, setShowLinking] = useState(false);
   const [linkForm, setLinkForm] = useState({ username: '', password: '' });
+  const [credentials, setCredentials] = useState<StudentCredential[]>([]);
+
+  const loadCredentials = async (did: string) => {
+    try {
+      const result = await api.getHolderCredentials(did) as { credentials: StudentCredential[] };
+      setCredentials(result.credentials || []);
+    } catch (err) {
+      console.error('Failed to load credentials:', err);
+    }
+  };
 
   useEffect(() => {
-    const savedSessionId = localStorage.getItem('student_session_id');
+    const savedSessionId = localStorage.getItem(student_session_id);
     if (savedSessionId) {
       api.getAuthStatus(savedSessionId).then((status) => {
         const expiresAt = new Date(status.expires_at);
@@ -25,10 +36,13 @@ export default function StudentPortal() {
           if (status.did_verified && !status.student_linked) {
             setShowLinking(true);
           }
+          if (status.student_linked && status.did) {
+            loadCredentials(status.did);
+          }
         } else {
-          localStorage.removeItem('student_session_id');
+          localStorage.removeItem(student_session_id);
         }
-      }).catch(() => { localStorage.removeItem('student_session_id'); })
+      }).catch(() => { localStorage.removeItem(student_session_id); })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -42,7 +56,7 @@ export default function StudentPortal() {
       const result = await api.startAuth();
       setSessionId(result.sessionId);
       setQrCodeUrl(result.qrCodeUrl);
-      localStorage.setItem('student_session_id', result.sessionId);
+      localStorage.setItem(student_session_id, result.sessionId);
       pollAuthStatus(result.sessionId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
@@ -88,6 +102,9 @@ export default function StudentPortal() {
         setShowLinking(false);
         const status = await api.getAuthStatus(sessionId);
         setAuthStatus(status);
+        if (status.did) {
+          loadCredentials(status.did);
+        }
       } else {
         setError(result.error || 'Binding failed');
       }
@@ -99,7 +116,7 @@ export default function StudentPortal() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('student_session_id');
+    localStorage.removeItem(student_session_id);
     setSessionId('');
     setQrCodeUrl('');
     setAuthStatus(null);
@@ -238,11 +255,40 @@ export default function StudentPortal() {
                 <h3 className="text-xl font-semibold text-white mb-4">
                   Your Credentials
                 </h3>
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <p className="text-sm text-gray-400">
-                    No credentials yet.
-                  </p>
-                </div>
+                {credentials.length === 0 ? (
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <p className="text-sm text-gray-400">
+                      No credentials yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {credentials.map((cred) => (
+                      <div
+                        key={cred.id}
+                        className={`bg-gray-700 rounded-lg p-4 border-l-4 ${cred.is_revoked ? 'border-red-500' : 'border-green-500'
+                          }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <h4 className="text-white font-semibold">
+                            {cred.credential_type}
+                          </h4>
+                          <p className="text-sm text-gray-400 mt-1">
+                            Issued: {new Date(cred.issued_at).toLocaleDateString()}
+                          </p>
+                          {cred.expires_at && (
+                            <p className="text-sm text-gray-400">
+                              Expires: {new Date(cred.expires_at).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          ID: {cred.id}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

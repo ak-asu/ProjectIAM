@@ -20,14 +20,6 @@ export interface User {
   updated_at: string;
 }
 
-export interface DIDBinding {
-  id: string;
-  student_id: string;
-  did: string;
-  status: string;
-  bound_at: string;
-}
-
 export interface CredentialRecord {
   id: string;
   credential_hash: string;
@@ -59,19 +51,6 @@ export interface VerificationSession {
   created_at: string;
   expires_at: string;
   verified_at: string | null;
-}
-
-export interface AuditLog {
-  id: string;
-  event_type: string;
-  entity_type: string;
-  entity_id: string | null;
-  actor: string | null;
-  actor_type: string | null;
-  details: Record<string, unknown> | null;
-  ip_address: string | null;
-  user_agent: string | null;
-  created_at: string;
 }
 
 export interface CredentialSubject {
@@ -176,41 +155,15 @@ export interface IssuerNodeCredentialRequest {
   mtpProof?: boolean;
 }
 
-export interface IssuerNodeCredentialResponse {
-  id: string;
-  credential: {
-    '@context': string[];
-    id: string;
-    type: string[];
-    issuer: string;
-    issuanceDate: string;
-    credentialSubject: Record<string, any>;
-    proof: any;
-  };
-  mtp: {
-    existence: boolean;
-    siblings: string[];
-  };
-  state: {
-    claimsTreeRoot: string;
-    revocationTreeRoot: string;
-    rootOfRoots: string;
-    state: string;
-    txId?: string;
-  };
-}
-
-export interface VerificationConstraint {
-  field: string;
-  operator: '$eq' | '$ne' | '$gt' | '$gte' | '$lt' | '$lte' | '$in' | '$nin';
-  value: any;
-}
-
 export interface VerificationPolicy {
   allowedIssuers: string[];
   credentialType: string;
   schemaUrl?: string;
-  constraints?: VerificationConstraint[];
+  constraints?: {
+    field: string;
+    operator: '$eq' | '$ne' | '$gt' | '$gte' | '$lt' | '$lte' | '$in' | '$nin';
+    value: any;
+  }[];
   selectiveDisclosure?: {
     revealFields?: string[];
     hideFields?: string[];

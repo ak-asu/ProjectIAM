@@ -1,4 +1,4 @@
-import { IAuthService } from '../interfaces/AuthInterface';
+import { AuthInterface } from '../interfaces/AuthInterface';
 import {
   getSupabaseClient,
   Tables,
@@ -21,7 +21,7 @@ interface PortalSession {
   expiresAt: number;
 }
 
-export class AuthService implements IAuthService {
+export class AuthService implements AuthInterface {
   private db = getSupabaseClient();
   private portalSessions: Map<string, PortalSession> = new Map();
 

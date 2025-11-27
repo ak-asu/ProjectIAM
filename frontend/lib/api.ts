@@ -1,52 +1,14 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import {
+  admin_api_key,
+  portal_token,
+  API_BASE_URL,
+  AuthStartResult,
+  AuthStatus,
+  LinkStudentResult,
+  PortalLoginResult,
+  IssuanceResult,
+} from "./constants";
 
-interface ApiError {
-  error: string;
-}
-
-export interface IssuanceResult {
-  success: boolean;
-  cred_id?: string;
-  tx_hash?: string;
-  merkle_root?: string;
-  ipfs_cid?: string;
-  error?: string;
-  offer_qr_data?: {
-    qr_code_url: string;
-    offer_url: string;
-  };
-}
-
-export interface AuthStartResult {
-  sessionId: string;
-  qrCodeUrl: string;
-}
-
-export interface AuthStatus {
-  did_verified: boolean;
-  student_linked: boolean;
-  did?: string;
-  student_id?: string;
-  expires_at: string;
-}
-
-export interface LinkStudentResult {
-  success: boolean;
-  error?: string;
-}
-
-export interface PortalLoginResult {
-  success: boolean;
-  token?: string;
-  user?: {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-  };
-  expiresAt?: string;
-  error?: string;
-}
 
 export class APIClient {
   private baseUrl: string;
@@ -56,8 +18,8 @@ export class APIClient {
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
     if (typeof window !== 'undefined') {
-      this.portalToken = localStorage.getItem('portal_token');
-      this.adminApiKey = localStorage.getItem('admin_api_key');
+      this.portalToken = localStorage.getItem(portal_token);
+      this.adminApiKey = localStorage.getItem(admin_api_key);
     }
   }
 
@@ -65,9 +27,9 @@ export class APIClient {
     this.portalToken = token;
     if (typeof window !== 'undefined') {
       if (token) {
-        localStorage.setItem('portal_token', token);
+        localStorage.setItem(portal_token, token);
       } else {
-        localStorage.removeItem('portal_token');
+        localStorage.removeItem(portal_token);
       }
     }
   }
@@ -76,9 +38,9 @@ export class APIClient {
     this.adminApiKey = apiKey;
     if (typeof window !== 'undefined') {
       if (apiKey) {
-        localStorage.setItem('admin_api_key', apiKey);
+        localStorage.setItem(admin_api_key, apiKey);
       } else {
-        localStorage.removeItem('admin_api_key');
+        localStorage.removeItem(admin_api_key);
       }
     }
   }
@@ -103,8 +65,8 @@ export class APIClient {
       headers,
     });
     if (!response.ok) {
-      const error = await response.json().catch(() => ({} as ApiError));
-      throw new Error((error as ApiError).error || `${response.status}: ${response.statusText}`);
+      const error = await response.json().catch(() => ({} as { error: string }));
+      throw new Error(error.error || `${response.status}: ${response.statusText}`);
     }
     return response.json();
   }
