@@ -80,12 +80,7 @@ async function startServer() {
     } else {
       console.log('Database connected successfully');
     }
-    if (config.contractAddr && config.rpcUrl) {
-      await initializeBlockchain();
-      console.log('Blockchain initialized');
-    } else {
-      console.warn('Warning: Blockchain not configured');
-    }
+    await initializeBlockchain();
     app.listen(config.port, () => {
       console.log(`Server running on port ${config.port}`);
     });

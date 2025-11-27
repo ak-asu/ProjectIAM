@@ -10,7 +10,7 @@ import {
   StudentLinkingResult,
 } from '../types';
 
-export interface IAuthService {
+export interface AuthInterface {
   startAuthSession(): Promise<{
     session: Session;
     qr_data: AuthQRData;

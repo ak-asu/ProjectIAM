@@ -1,4 +1,4 @@
-import { IIssuerService } from '../interfaces/IssuerInterface';
+import { IssuerInterface } from '../interfaces/IssuerInterface';
 import {
   getSupabaseClient,
   Tables,
@@ -15,7 +15,7 @@ import { generateId, dateToTimestamp } from '../helpers/crypto';
 import { ethers } from 'ethers';
 import { config } from '../config';
 
-export class IssuerService implements IIssuerService {
+export class IssuerService implements IssuerInterface {
   private db = getSupabaseClient();
   private blockchain = getBlockchainService();
   private ipfs = getIPFSService();
@@ -266,7 +266,7 @@ export class IssuerService implements IIssuerService {
     return record;
   }
 
-  async getAllCredsByHolder(holder_did: string): Promise<CredentialRecord[]> {
+  async getAllCredentialsByHolder(holder_did: string): Promise<CredentialRecord[]> {
     const { data: records, error } = await this.db
       .from(Tables.CREDENTIAL_RECORDS)
       .select('*')
@@ -328,30 +328,87 @@ export class IssuerService implements IIssuerService {
   }
 
   private async callIssuerNode(request: IssuerNodeCredentialRequest) {
-    return {
-      id: `credential-${Date.now()}`,
-      credential: {
-        '@context': ['https://www.w3.org/2018/credentials/v1'],
-        id: `urn:uuid:${Date.now()}`,
-        type: request.type,
-        issuer: config.issuerDID,
-        issuanceDate: new Date().toISOString(),
-        credentialSubject: request.credentialSubject,
-        proof: {
-          revocationNonce: request.revocationNonce || 0,
-        },
-      },
-      mtp: {
-        existence: true,
-        siblings: [],
-      },
-      state: {
-        claimsTreeRoot: ethers.keccak256(ethers.toUtf8Bytes('claims-tree')),
-        revocationTreeRoot: ethers.keccak256(ethers.toUtf8Bytes('revocation-tree')),
-        rootOfRoots: ethers.keccak256(ethers.toUtf8Bytes('root-of-roots')),
-        state: ethers.keccak256(ethers.toUtf8Bytes('state')),
-        txId: '0x' + '0'.repeat(64),
-      },
+    const parts = config.issuerDID.split(':');
+    const issuerIdentifier = parts[parts.length - 1];
+    const apiUrl = `${config.issuerNodeBaseUrl}/v2/identities/${issuerIdentifier}/credentials`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
     };
+    if (config.issuerNodeApiKey) {
+      headers['Authorization'] = `Bearer ${config.issuerNodeApiKey}`;
+    }
+    const credReq = {
+      credentialSchema: request.schema,
+      type: Array.isArray(request.type) ? request.type[request.type.length - 1] : request.type,
+      credentialSubject: request.credentialSubject,
+      expiration: request.expiration ? new Date(request.expiration).getTime() : null,
+      mtProof: request.mtpProof ?? true,
+      signatureProof: true,
+      revocationNonce: request.revocationNonce,
+    };
+    let lastErr: Error | null = null;
+    const maxRetries = 2;
+    for (let retry = 1; retry <= maxRetries; retry++) {
+      try {
+        const resp = await fetch(apiUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(credReq),
+        });
+        if (!resp.ok) {
+          throw new Error(`Issuer Node API error: ${resp.status} - ${resp.text()}`);
+        }
+        const result = await resp.json() as {
+          id?: string;
+          credentialSubject?: Record<string, any>;
+          issuanceDate?: string;
+          revNonce?: number;
+          mtp?: { existence: boolean; siblings: string[] };
+          proof?: {
+            mtp?: { siblings: string[] };
+            issuer?: {
+              claimsTreeRoot?: string;
+              revocationTreeRoot?: string;
+              rootOfRoots?: string;
+              state?: string;
+            };
+            txId?: string;
+          };
+        };
+        const credId = result.id || `credential-${Date.now()}`;
+        return {
+          id: credId,
+          credential: {
+            '@context': result.credentialSubject?.['@context'] || ['https://www.w3.org/2018/credentials/v1'],
+            id: credId,
+            type: request.type,
+            issuer: config.issuerDID,
+            issuanceDate: result.issuanceDate || new Date().toISOString(),
+            credentialSubject: result.credentialSubject || request.credentialSubject,
+            proof: {
+              revocationNonce: result.revNonce || request.revocationNonce || 0,
+            },
+          },
+          mtp: result.mtp || {
+            existence: true,
+            siblings: result.proof?.mtp?.siblings || [],
+          },
+          state: {
+            claimsTreeRoot: result.proof?.issuer?.claimsTreeRoot || ethers.keccak256(ethers.toUtf8Bytes(`claims-${credId}`)),
+            revocationTreeRoot: result.proof?.issuer?.revocationTreeRoot || ethers.keccak256(ethers.toUtf8Bytes(`revocation-${credId}`)),
+            rootOfRoots: result.proof?.issuer?.rootOfRoots || ethers.keccak256(ethers.toUtf8Bytes(`roots-${credId}`)),
+            state: result.proof?.issuer?.state || ethers.keccak256(ethers.toUtf8Bytes(`state-${credId}`)),
+            txId: result.proof?.txId || '',
+          },
+        };
+      } catch (error) {
+        lastErr = error instanceof Error ? error : new Error(String(error));
+        console.error(`Issuer Node API failed:`, lastErr.message);
+        if (retry < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * retry));
+        }
+      }
+    }
+    throw lastErr || new Error('Issuer Node API call failed after retries');
   }
 }

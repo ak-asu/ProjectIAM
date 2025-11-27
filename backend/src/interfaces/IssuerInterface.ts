@@ -9,7 +9,7 @@ import {
   CredentialRecord,
 } from '../types';
 
-export interface IIssuerService {
+export interface IssuerInterface {
   prepareCred(request: PrepareCredentialRequest): Promise<{
     student_id: string;
     student_name: string;
@@ -31,7 +31,7 @@ export interface IIssuerService {
     error?: string;
   }>;
   getCredential(cred_id: string): Promise<CredentialRecord | null>;
-  getAllCredsByHolder(holder_did: string): Promise<CredentialRecord[]>;
+  getAllCredentialsByHolder(holder_did: string): Promise<CredentialRecord[]>;
   getAllCredentials(limit?: number, offset?: number): Promise<{
     credentials: CredentialRecord[];
     total: number;

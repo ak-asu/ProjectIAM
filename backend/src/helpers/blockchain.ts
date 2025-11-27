@@ -1,6 +1,4 @@
 import { ethers } from 'ethers';
-import * as fs from 'fs';
-import * as path from 'path';
 import { config } from '../config';
 
 export class BlockchainService {
@@ -9,37 +7,31 @@ export class BlockchainService {
   private signer: ethers.Wallet | null = null;
 
   constructor() {
-    if (!config.rpcUrl) {
-      throw new Error('RPC_URL not configured in environment');
-    }
     this.provider = new ethers.JsonRpcProvider(config.rpcUrl);
   }
 
   async initializeContract() {
-    if (!config.contractAddr) {
-      throw new Error('CONTRACT_ADDRESS not configured');
-    }
-    const abiPath = path.join(
-      __dirname,
-      '../../../contracts/artifacts/contracts/UniCredRegistry.sol/UniCredRegistry.json'
-    );
-    let abi;
-    if (fs.existsSync(abiPath)) {
-      const contractJson = JSON.parse(fs.readFileSync(abiPath, 'utf-8'));
-      abi = contractJson.abi;
-    } else {
-      abi = [
-        'function issueCredential(string holderDID, bytes32 credHash, bytes32 merkleRoot, string ipfsCID, uint256 expiresAt) external returns (bytes32)',
-        'function revokeCredential(bytes32 credId, string reason) external returns (bool)',
-        'function getCredential(bytes32 credId) external view returns (tuple(bytes32 credId, string issuerDID, string holderDID, bytes32 credHash, bytes32 merkleRoot, string ipfsCID, uint256 issuedAt, uint256 expiresAt, bool isRevoked, string revocationReason, uint256 revokedAt))',
-        'function isCredentialValid(bytes32 credId) external view returns (bool, string)',
-        'function verifyCredentialHash(bytes32 credId, bytes32 providedHash) external view returns (bool)',
-        'function getAllCredentialsByHolder(string holderDID) external view returns (bytes32[])',
-        'function registerIssuer(string issuerDID, address issuerAddress, string name) external returns (bool)',
-        'event CredentialIssued(bytes32 indexed credId, string issuerDID, string holderDID, bytes32 credHash, bytes32 merkleRoot, uint256 timestamp)',
-        'event CredentialRevoked(bytes32 indexed credId, address indexed revoker, string reason, uint256 timestamp)',
-      ];
-    }
+    const abi = [
+      'function issueCredential(string calldata holderDID, bytes32 credHash, bytes32 merkleRoot, string calldata ipfsCID, uint256 expiresAt) external returns (bytes32)',
+      'function revokeCredential(bytes32 credId, string calldata reason) external returns (bool)',
+      'function updateMerkleRoot(bytes32 credId, bytes32 newMerkleRoot) external returns (bool)',
+      'function getCredential(bytes32 credId) external view returns (tuple(bytes32 credId, string issuerDID, string holderDID, bytes32 credHash, bytes32 merkleRoot, string ipfsCID, uint256 issuedAt, uint256 expiresAt, bool isRevoked, string revocationReason, uint256 revokedAt))',
+      'function isCredentialValid(bytes32 credId) external view returns (bool, string)',
+      'function verifyCredentialHash(bytes32 credId, bytes32 providedHash) external view returns (bool)',
+      'function getAllCredentialsByHolder(string calldata holderDID) external view returns (bytes32[])',
+      'function getAllCredentialsByIssuer(string calldata issuerDID) external view returns (bytes32[])',
+      'function registerIssuer(string calldata issuerDID, address issuerAddress, string calldata name) external returns (bool)',
+      'function deactivateIssuer(string calldata issuerDID) external',
+      'function reactivateIssuer(string calldata issuerDID) external',
+      'function getIssuer(string calldata issuerDID) external view returns (tuple(string issuerDID, address issuerAddress, string name, bool isActive, uint256 registeredAt))',
+      'function isAuthorizedIssuer(address issuerAddress, string calldata issuerDID) external view returns (bool)',
+      'function transferAdmin(address newAdmin) external',
+      'function getTotalIssuedCredentials() external view returns (uint256)',
+      'event CredentialIssued(bytes32 indexed credId, string indexed issuerDID, string indexed holderDID, bytes32 credHash, bytes32 merkleRoot, uint256 issuedAt)',
+      'event CredentialRevoked(bytes32 indexed credId, address indexed revokedBy, string reason, uint256 revokedAt)',
+      'event MerkleRootUpdated(bytes32 indexed credId, bytes32 oldMerkleRoot, bytes32 newMerkleRoot, uint256 updatedAt)',
+      'event IssuerRegistered(string indexed issuerDID, address indexed issuerAddress, string name)',
+    ];
     if (config.issuerPrivateKey) {
       this.signer = new ethers.Wallet(config.issuerPrivateKey, this.provider);
       this.contract = new ethers.Contract(config.contractAddr, abi, this.signer);
@@ -53,14 +45,6 @@ export class BlockchainService {
       throw new Error('Contract not initialized - call initializeContract() first');
     }
     return this.contract;
-  }
-
-  getProvider() {
-    return this.provider;
-  }
-
-  getSigner() {
-    return this.signer;
   }
 
   async issueCredOnChain(
@@ -140,7 +124,7 @@ export class BlockchainService {
     return await contract.verifyCredentialHash(credId, credHash);
   }
 
-  async getAllCredsByHolder(holderDID: string) {
+  async getAllCredentialsByHolder(holderDID: string) {
     const contract = this.getContract();
     const credIds = await contract.getAllCredentialsByHolder(holderDID);
     return credIds.map((id: any) => id.toString());

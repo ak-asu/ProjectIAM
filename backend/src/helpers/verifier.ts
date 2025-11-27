@@ -1,4 +1,7 @@
+import * as fs from 'fs';
 import { getBlockchainService } from './blockchain';
+import { config } from '../config';
+import * as snarkjs from 'snarkjs';
 
 export interface ZKProof {
   type: string;
@@ -11,26 +14,26 @@ export interface ZKProof {
   };
 }
 
-export interface ProofVerificationResult {
-  verified: boolean;
-  holderDID: string;
-  issuerDID: string;
-  credId?: string;
-  disclosedAttributes?: Record<string, any>;
-  errors?: string[];
+interface VerificationKeyData {
+  protocol: string;
+  curve: string;
+  nPublic: number;
+  vk_alpha_1: string[];
+  vk_beta_2: string[][];
+  vk_gamma_2: string[][];
+  vk_delta_2: string[][];
+  vk_alphabeta_12: string[][][];
+  IC: string[][];
 }
 
-export function verifyIssuerAuth(
-  issuerDID: string,
-  allowedIssuers: string[]
-) {
+export function verifyIssuerAuth(issuerDID: string, allowedIssuers: string[]): boolean {
   if (!allowedIssuers || allowedIssuers.length === 0) {
     return true;
   }
   return allowedIssuers.includes(issuerDID);
 }
 
-export async function checkCredentialOnChain(credId: string) {
+export async function checkCredOnChain(credId: string): Promise<{ isValid: boolean; reason: string }> {
   try {
     const blockchain = getBlockchainService();
     return await blockchain.isCredentialValid(credId);
@@ -42,10 +45,7 @@ export async function checkCredentialOnChain(credId: string) {
   }
 }
 
-export async function verifyCredHash(
-  credId: string,
-  providedHash: string
-) {
+export async function verifyCredHash(credId: string, providedHash: string): Promise<boolean> {
   try {
     const blockchain = getBlockchainService();
     return await blockchain.verifyCredHash(credId, providedHash);
@@ -55,18 +55,72 @@ export async function verifyCredHash(
   }
 }
 
-export function extractClaimsFromPublicSignals(publicSignals: string[]) {
+export async function proofVerification(
+  proof: ZKProof,
+  verificationKeyPath?: string
+): Promise<{ verified: boolean; errors: string[] }> {
+  try {
+    if (!proof || !proof.proof || !proof.pub_signals || !proof.proof.pi_a || !proof.proof.pi_b || !proof.proof.pi_c) {
+      return { verified: false, errors: ['Invalid proof'] };
+    }
+    const vKeyPath = verificationKeyPath || config.verificationKeyPath;
+    const vKeyContent = fs.readFileSync(vKeyPath, 'utf-8');
+    const vKey: VerificationKeyData = JSON.parse(vKeyContent);
+    const tempProof = {
+      pi_a: proof.proof.pi_a,
+      pi_b: proof.proof.pi_b,
+      pi_c: proof.proof.pi_c,
+      protocol: proof.proof.protocol || 'groth16',
+      curve: 'bn128',
+    };
+    const isValid = await snarkjs.groth16.verify(vKey, proof.pub_signals, tempProof);
+    if (!isValid) {
+      return { verified: false, errors: ['Cryptographic proof verification failed'] };
+    }
+    return { verified: true, errors: [] };
+  } catch (error: any) {
+    return { verified: false, errors: [`Proof verification error: ${error.message}`] };
+  }
+}
+
+export function claimsFromPubSignals(publicSigs: string[]): Record<string, any> {
   const claims: Record<string, any> = {};
-  if (publicSignals.length > 0) {
-    claims.userID = publicSignals[0];
+  if (!publicSigs || publicSigs.length === 0) {
+    return claims;
   }
-  if (publicSignals.length > 1) {
-    claims.issuerID = publicSignals[1];
-  }
+  // Polygon ID credentialAtomicQuerySigV2 circuit public signals layout
+  // Index 0: 1 if credential is merklized
+  // Index 1: holder's identity
+  // Index 4: issuer's claim non-revocation state
+  // Index 5: hash of the claim schema
+  // Index 6: index of the claim field being queried
+  // Index 7: query operator: 0=noop, 1=eq, 2=lt, 3=gt, 4=in, 5=nin
+  // Index 8-71: query comparison values array
+  // Index 72: proof generation time
+  // Index 74: merkle tree path key for merklized credentials
+  // Index 76: verification requester
+  if (publicSigs.length > 0) claims.merklized = publicSigs[0] === '1';
+  if (publicSigs.length > 1) claims.userID = publicSigs[1];
+  if (publicSigs.length > 2) claims.issuerID = publicSigs[2];
+  if (publicSigs.length > 3) claims.issuerAuthState = publicSigs[3];
+  if (publicSigs.length > 4) claims.issuerClaimNonRevState = publicSigs[4];
+  if (publicSigs.length > 5) claims.claimSchema = publicSigs[5];
+  if (publicSigs.length > 6) claims.slotIndex = parseInt(publicSigs[6], 10);
+  if (publicSigs.length > 7) claims.operator = parseInt(publicSigs[7], 10);
+  if (publicSigs.length > 71) claims.value = publicSigs.slice(8, 72);
+  if (publicSigs.length > 72) claims.timestamp = publicSigs[72];
+  if (publicSigs.length > 73) claims.isRevocationChecked = publicSigs[73] === '1';
+  if (publicSigs.length > 74) claims.claimPathKey = publicSigs[74];
+  if (publicSigs.length > 75) claims.claimPathNotExists = publicSigs[75] === '1';
+  if (publicSigs.length > 76) claims.requestID = publicSigs[76];
   return claims;
 }
 
-export function validateProofReq(proofReq: any) {
+export function didFromId(id: string, blockchain = 'polygon', network = 'amoy'): string {
+  return `did:polygonid:${blockchain}:${network}:${id}`;
+}
+
+export function validateProofReq(proofReq: any): boolean {
   if (!proofReq || typeof proofReq !== 'object') {
     return false;
   }
@@ -76,23 +130,16 @@ export function validateProofReq(proofReq: any) {
       return false;
     }
   }
-  if (
-    proofReq.type !==
-    'https://iden3-communication.io/proofs/1.0/request'
-  ) {
+  if (proofReq.type !== 'https://iden3-communication.io/proofs/1.0/request') {
     return false;
   }
-  if (
-    !proofReq.body.callbackUrl ||
-    !proofReq.body.scope ||
-    !Array.isArray(proofReq.body.scope)
-  ) {
+  if (!proofReq.body.callbackUrl || !proofReq.body.scope || !Array.isArray(proofReq.body.scope)) {
     return false;
   }
   return true;
 }
 
-export function validateProofResp(proofResp: any) {
+export function validateProofResp(proofResp: any): boolean {
   if (!proofResp || typeof proofResp !== 'object') {
     return false;
   }
@@ -102,14 +149,43 @@ export function validateProofResp(proofResp: any) {
       return false;
     }
   }
-  if (
-    proofResp.type !==
-    'https://iden3-communication.io/proofs/1.0/response'
-  ) {
+  if (proofResp.type !== 'https://iden3-communication.io/proofs/1.0/response') {
     return false;
   }
   if (!proofResp.body.scope || !Array.isArray(proofResp.body.scope)) {
     return false;
   }
   return true;
+}
+
+export async function validatePublicSignals(
+  publicSignals: string[],
+  expectedRequestID?: string
+): Promise<{ valid: boolean; errors: string[] }> {
+  if (!publicSignals || publicSignals.length === 0) {
+    return { valid: false, errors: ['Public signals array is empty'] };
+  }
+  const errors: string[] = [];
+  const claims = claimsFromPubSignals(publicSignals);
+  if (!claims.userID) {
+    errors.push('User ID not found in public signals');
+  }
+  if (!claims.issuerID) {
+    errors.push('Issuer ID not found in public signals');
+  }
+  if (expectedRequestID && claims.requestID !== expectedRequestID) {
+    errors.push(`ReqID: expected ${expectedRequestID}, got ${claims.requestID}`);
+  }
+  if (claims.timestamp) {
+    const proofTime = parseInt(claims.timestamp, 10);
+    const now = Math.floor(Date.now() / 1000);
+    const maxAge = 3600; // 1 hour
+    if (now - proofTime > maxAge) {
+      errors.push('Proof timestamp is too old');
+    }
+  }
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
 }

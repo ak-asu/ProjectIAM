@@ -2,7 +2,14 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypt
 import { config } from '../config';
 
 export class IPFSService {
-  async upload(data: any, encrypt = true, holderDID?: string) {
+  private getAuthHeaders(): Record<string, string> {
+    return {
+      'Authorization': `Bearer ${config.pinataJwt}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  async upload(data: any, encrypt = true, holderDID?: string): Promise<string> {
     let dataToUpload: any;
     if (encrypt && holderDID) {
       const encrypted = this.encryptData(data, holderDID);
@@ -15,27 +22,76 @@ export class IPFSService {
     } else {
       dataToUpload = data;
     }
-    const jsonData = JSON.stringify(dataToUpload);
-    const cid = this.generateCID(jsonData);
-    return cid;
+    const pinataUrl = `${config.ipfsApiUrl}/pinning/pinJSONToIPFS`;
+    const response = await fetch(pinataUrl, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        pinataContent: dataToUpload,
+        pinataMetadata: {
+          name: `credential-${Date.now()}`,
+        },
+        pinataOptions: {
+          cidVersion: 0,
+        },
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Pinata upload failed: ${response.status} - ${error}`);
+    }
+    const result = await response.json() as { IpfsHash?: string };
+    if (!result.IpfsHash) {
+      throw new Error('IpfsHash is missing');
+    }
+    return result.IpfsHash;
   }
 
-  async fetch(cid: string, holderDID?: string) {
-    const data = {
-      encrypted: false,
-      data: '',
-      iv: '',
-      tag: '',
-    };
-    if (data.encrypted && holderDID && data.iv && data.tag) {
-      return this.decryptData(
-        data.data,
-        data.iv,
-        data.tag,
-        holderDID
-      );
+  async fetch(cid: string, holderDID?: string): Promise<any> {
+    const gatewayUrl = `${config.ipfsGateway}/ipfs/${cid}`;
+    const response = await fetch(gatewayUrl);
+    if (!response.ok) {
+      throw new Error(`IPFS fetch failed: ${response.status} - ${response.statusText}`);
+    }
+    const data = await response.json() as { encrypted?: boolean; data?: string; iv?: string; tag?: string };
+    if (data.encrypted && holderDID && data.iv && data.tag && data.data) {
+      return this.decryptData(data.data, data.iv, data.tag, holderDID);
     }
     return data.data || data;
+  }
+
+  async pin(cid: string): Promise<boolean> {
+    const pinataUrl = `${config.ipfsApiUrl}/pinning/pinByHash`;
+    const response = await fetch(pinataUrl, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({
+        hashToPin: cid,
+        pinataMetadata: {
+          name: `pinned-${Date.now()}`,
+        },
+      }),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Pinata pin failed: ${response.status} - ${errorText}`);
+      return false;
+    }
+    return true;
+  }
+
+  async unpin(cid: string): Promise<boolean> {
+    const pinataUrl = `${config.ipfsApiUrl}/pinning/unpin/${cid}`;
+    const response = await fetch(pinataUrl, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Pinata unpin failed: ${response.status} - ${errorText}`);
+      return false;
+    }
+    return true;
   }
 
   private encryptData(
@@ -72,26 +128,15 @@ export class IPFSService {
     return JSON.parse(decrypted);
   }
 
-  private deriveKey(holderDID: string) {
-    const secret = config.encryptionSecret;
-    const combined = `${secret}:${holderDID}`;
+  private deriveKey(holderDID: string): Buffer {
+    const combined = `${config.encryptionSecret}:${holderDID}`;
     return createHash('sha256').update(combined).digest();
-  }
-
-  private generateCID(data: string) {
-    const hash = createHash('sha256').update(data).digest('hex');
-    return `Qm${hash.substring(0, 44)}`;
-  }
-
-  getGatewayUrl(cid: string) {
-    const gateway = config.ipfsGateway;
-    return `${gateway}/ipfs/${cid}`;
   }
 }
 
 let ipfsService: IPFSService | null = null;
 
-export function getIPFSService() {
+export function getIPFSService(): IPFSService {
   if (!ipfsService) {
     ipfsService = new IPFSService();
   }
