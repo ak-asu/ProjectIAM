@@ -2,26 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../../lib/api';
-
-interface VerificationResult {
-  verified: boolean;
-  holder_did?: string;
-  issuer_did?: string;
-  cred_id?: string;
-  verified_at: string;
-  checks: {
-    proof_valid: boolean;
-    issuer_allowed: boolean;
-    type_matches: boolean;
-    not_revoked: boolean;
-    not_expired: boolean;
-    constraints_satisfied: boolean;
-  };
-  disclosed_attributes?: Record<string, unknown>;
-  failure_reason?: string;
-  errors?: string[];
-}
+import { VerificationResult, VerificationSession } from '../../lib/constants';
 
 export default function EmployerPortal() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -38,6 +21,16 @@ export default function EmployerPortal() {
   });
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [verifyResult, setVerifyResult] = useState<VerificationResult | null>(null);
+  const [verificationHistory, setVerificationHistory] = useState<VerificationSession[]>([]);
+
+  const loadHistory = async () => {
+    try {
+      const result = await api.getVerificationSessions('employer-portal', 50, 0) as { sessions: VerificationSession[]; total: number };
+      setVerificationHistory(result.sessions || []);
+    } catch (err) {
+      console.error('Failed to load history:', err);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -45,11 +38,12 @@ export default function EmployerPortal() {
         if (result.success && result.user && result.user.role === 'employer') {
           setIsAuthenticated(true);
           setUserInfo(result.user);
+          loadHistory();
         }
       }).catch(() => {
         setIsAuthenticated(false);
       });
-    } catch (err) {
+    } catch {
       setIsAuthenticated(false);
     }
   }, []);
@@ -381,15 +375,12 @@ export default function EmployerPortal() {
                         Candidate scans with Privado ID wallet
                       </p>
                       <div className="bg-white p-8 rounded-lg inline-block">
-                        <div className="text-center">
-                          <div className="text-8xl mb-4">📱</div>
-                          <p className="text-sm text-gray-500 mb-4">QR Code</p>
-                          <code className="text-xs bg-gray-100 px-2 py-1 rounded break-all block">
-                            {qrCodeUrl}
-                          </code>
-                        </div>
+                        <QRCodeSVG value={qrCodeUrl} size={256} level="M" />
                       </div>
-                      <p className="mt-6 text-sm text-gray-400">Waiting...</p>
+                      <p className="text-xs text-gray-400 mt-4 break-all max-w-md mx-auto">
+                        {qrCodeUrl}
+                      </p>
+                      <p className="mt-4 text-sm text-gray-400">Waiting for proof...</p>
                     </div>
                   )}
                   {verifyResult && (
@@ -448,11 +439,63 @@ export default function EmployerPortal() {
                   <h2 className="text-2xl font-bold text-white mb-6">
                     Verification History
                   </h2>
-                  <div className="bg-gray-700 rounded-lg p-6">
-                    <p className="text-gray-300">
-                      No history yet. Complete your first verification to see results here.
-                    </p>
-                  </div>
+                  {verificationHistory.length === 0 ? (
+                    <div className="bg-gray-700 rounded-lg p-6">
+                      <p className="text-gray-300">
+                        No history yet.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="bg-gray-700">
+                          <tr>
+                            <th className="px-4 py-3 text-gray-300 font-semibold">Date</th>
+                            <th className="px-4 py-3 text-gray-300 font-semibold">Status</th>
+                            <th className="px-4 py-3 text-gray-300 font-semibold">Holder</th>
+                            <th className="px-4 py-3 text-gray-300 font-semibold">Result</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-700">
+                          {verificationHistory.map((session) => (
+                            <tr key={session.id} className="hover:bg-gray-750">
+                              <td className="px-4 py-3 text-gray-400 text-sm">
+                                {new Date(session.created_at).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 text-xs rounded ${
+                                  session.status === 'verified'
+                                    ? 'bg-green-900 text-green-200'
+                                    : session.status === 'rejected'
+                                    ? 'bg-red-900 text-red-200'
+                                    : 'bg-yellow-900 text-yellow-200'
+                                }`}>
+                                  {session.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-gray-300 text-sm">
+                                {session.result?.holder_did
+                                  ? `${session.result.holder_did.substring(0, 25)}...`
+                                  : '-'}
+                              </td>
+                              <td className="px-4 py-3">
+                                {session.result?.verified !== undefined && (
+                                  session.result.verified ? (
+                                    <span className="text-green-400 text-sm">Valid</span>
+                                  ) : (
+                                    <span className="text-red-400 text-sm">Invalid</span>
+                                  )
+                                )}
+                                {session.result?.verified === undefined && (
+                                  <span className="text-gray-500 text-sm">Pending</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
