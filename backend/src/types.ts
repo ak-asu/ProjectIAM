@@ -9,17 +9,6 @@ export interface Session {
   expires_at: string;
 }
 
-export interface User {
-  id: string;
-  student_id: string;
-  name: string;
-  email: string;
-  password_hash: string | null;
-  role: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface CredentialRecord {
   id: string;
   credential_hash: string;

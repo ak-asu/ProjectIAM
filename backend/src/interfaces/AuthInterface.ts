@@ -34,9 +34,6 @@ export interface AuthInterface {
     student_id?: string;
     expires_at: string;
   }>;
-  getDIDForStudent(student_id: string): Promise<string | null>;
-  getStudentForDID(did: string): Promise<string | null>;
-  invalidateSession(session_id: string): Promise<void>;
   cleanupExpiredSessions(): Promise<number>; // Run via cron
   portalLogin(email: string, password: string): Promise<{
     success: boolean;

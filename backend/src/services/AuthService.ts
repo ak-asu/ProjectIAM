@@ -295,31 +295,6 @@ export class AuthService implements AuthInterface {
     };
   }
 
-  async getDIDForStudent(student_id: string) {
-    const { data: binding } = await this.db
-      .from(Tables.DID_BINDINGS)
-      .select('did')
-      .eq('student_id', student_id)
-      .single();
-    return binding?.did || null;
-  }
-
-  async getStudentForDID(did: string) {
-    const { data: binding } = await this.db
-      .from(Tables.DID_BINDINGS)
-      .select('student_id')
-      .eq('did', did)
-      .single();
-    return binding?.student_id || null;
-  }
-
-  async invalidateSession(session_id: string) {
-    await this.db
-      .from(Tables.SESSIONS)
-      .delete()
-      .eq('id', session_id);
-  }
-
   async cleanupExpiredSessions() {
     const { data, error } = await this.db
       .from(Tables.SESSIONS)

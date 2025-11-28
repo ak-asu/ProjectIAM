@@ -20,6 +20,7 @@ import {
   proofVerification,
   claimsFromPubSignals,
   didFromId,
+  validatePublicSignals,
 } from '../helpers/verifier';
 import { config } from '../config';
 
@@ -204,10 +205,6 @@ export class VerifierService implements VerifierInterface {
     };
   }
 
-  async verifyCredHash(cred_id: string, cred_hash: string) {
-    return await this.blockchain.verifyCredHash(cred_id, cred_hash);
-  }
-
   async checkCredValidity(cred_id: string) {
     return await this.blockchain.isCredentialValid(cred_id);
   }
@@ -311,6 +308,18 @@ export class VerifierService implements VerifierInterface {
           cred_id: undefined,
           disclosed_attributes: undefined,
           errors: zkVerify.errors,
+        };
+      }
+      const sigsValid = await validatePublicSignals(proof.pub_signals);
+      if (!sigsValid.valid) {
+        errors.push(...sigsValid.errors);
+        return {
+          verified: false,
+          holder_did,
+          issuer_did: '',
+          cred_id: undefined,
+          disclosed_attributes: undefined,
+          errors,
         };
       }
       const claims = claimsFromPubSignals(proof.pub_signals);

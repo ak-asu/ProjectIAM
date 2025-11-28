@@ -45,16 +45,6 @@ export async function checkCredOnChain(credId: string): Promise<{ isValid: boole
   }
 }
 
-export async function verifyCredHash(credId: string, providedHash: string): Promise<boolean> {
-  try {
-    const blockchain = getBlockchainService();
-    return await blockchain.verifyCredHash(credId, providedHash);
-  } catch (error: any) {
-    console.error('Hash verification error:', error);
-    return false;
-  }
-}
-
 export async function proofVerification(
   proof: ZKProof,
   verificationKeyPath?: string

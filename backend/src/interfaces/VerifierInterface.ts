@@ -25,7 +25,6 @@ export interface VerifierInterface {
     result?: VerificationResult;
     expires_at: string;
   }>;
-  verifyCredHash(cred_id: string, cred_hash: string): Promise<boolean>;
   checkCredValidity(cred_id: string): Promise<{
     isValid: boolean;
     reason: string;
