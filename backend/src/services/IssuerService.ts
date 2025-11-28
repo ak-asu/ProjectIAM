@@ -76,9 +76,7 @@ export class IssuerService implements IssuerInterface {
       const schemaUrl = config.schemaUrl;
       const cred_id = generateId();
       const issuanceDate = new Date().toISOString();
-      const expirationDate = request.expiration_date
-        ? request.expiration_date.toISOString()
-        : null;
+      const expirationDate = request.expiration_date || null;
       const verifiableCredential = {
         '@context': [
           'https://www.w3.org/2018/credentials/v1',
@@ -106,7 +104,7 @@ export class IssuerService implements IssuerInterface {
       });
       const merkle_root = issuerNodeResponse.state?.rootOfRoots || ethers.keccak256(ethers.toUtf8Bytes('merkle-root-placeholder'));
       const expires_at_timestamp = request.expiration_date
-        ? dateToTimestamp(request.expiration_date)
+        ? dateToTimestamp(new Date(request.expiration_date))
         : 0;
       // Anchor credential on blockchain
       const blockchainResult = await this.blockchain.issueCredOnChain(
@@ -131,7 +129,7 @@ export class IssuerService implements IssuerInterface {
           ipfs_cid: ipfs_cid,
           revocation_nonce: issuerNodeResponse.credential?.proof?.revocationNonce || 0,
           issued_at: new Date().toISOString(),
-          expires_at: request.expiration_date?.toISOString() || null,
+          expires_at: request.expiration_date || null,
           is_revoked: false,
           issued_by: 'System',
         });

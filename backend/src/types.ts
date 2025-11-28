@@ -184,7 +184,7 @@ export interface PrepareCredentialRequest {
   student_id?: string;
   credential_type: string;
   credential_subject: CredentialSubject;
-  expiration_date?: Date;
+  expiration_date?: string; // ISO 8601
 }
 
 export interface CredentialIssuanceResult {
