@@ -105,9 +105,9 @@ export default function AdminPortal() {
     setOfferQR('');
     try {
       const result = await api.issueCredential({
-        studentId: credForm.studentId,
-        credentialType: 'DegreeCredential',
-        credentialSubject: {
+        student_id: credForm.studentId,
+        credential_type: 'DegreeCredential',
+        credential_subject: {
           university: credForm.university,
           degree: credForm.degree,
           major: credForm.major,
@@ -115,7 +115,7 @@ export default function AdminPortal() {
           ...(credForm.gpa && { gpa: parseFloat(credForm.gpa) }),
           ...(credForm.honors && { honors: credForm.honors }),
         },
-        expirationDate: new Date(new Date().setFullYear(new Date().getFullYear() + 10)),
+        expiration_date: new Date(new Date().setFullYear(new Date().getFullYear() + 10)),
       });
       if (result.success) {
         setSuccess('Credential issued successfully!');

@@ -150,7 +150,13 @@ export class APIClient {
     });
   }
 
-  async issueCredential(data: Record<string, unknown>): Promise<IssuanceResult> {
+  async issueCredential(data: {
+    student_id?: string;
+    session_id?: string;
+    credential_type: string;
+    credential_subject: Record<string, unknown>;
+    expiration_date?: Date;
+  }): Promise<IssuanceResult> {
     return this.request<IssuanceResult>('/api/issue/credential', {
       method: 'POST',
       body: JSON.stringify(data),
