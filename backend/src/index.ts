@@ -7,6 +7,8 @@ import { errorHandler, requestLogger } from './middleware';
 import { initializeBlockchain } from './helpers/blockchain';
 import { checkDbConnection } from './helpers/db';
 import { authRoutes, issuerRoutes, verifierRoutes } from './routes';
+import { AuthService } from './services/AuthService';
+import { VerifierService } from './services/VerifierService';
 
 const app = express();
 
@@ -81,6 +83,17 @@ async function startServer() {
       console.log('Database connected successfully');
     }
     await initializeBlockchain();
+    // Session cleanup every 6 hours
+    const authService = new AuthService();
+    const verifierService = new VerifierService();
+    setInterval(async () => {
+      try {
+        await authService.cleanupExpiredSessions();
+        await verifierService.cleanupExpiredSessions();
+      } catch (error) {
+        console.error('Session cleanup error:', error);
+      }
+    }, 6 * 60 * 60 * 1000);
     app.listen(config.port, () => {
       console.log(`Server running on port ${config.port}`);
     });

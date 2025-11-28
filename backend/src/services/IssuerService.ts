@@ -92,8 +92,8 @@ export class IssuerService implements IssuerInterface {
         credentialSubject: prepared.credential_subject,
       };
       const cred_hash = this.blockchain.hashCredential(verifiableCredential);
-      // Upload to IPFS (encrypted with holder's DID)
       const ipfs_cid = await this.ipfs.upload(verifiableCredential, true, prepared.holder_did);
+      await this.ipfs.pin(ipfs_cid);
       // Call Issuer Node to create merklized credential
       const issuerNodeResponse = await this.callIssuerNode({
         schema: schemaUrl,
@@ -217,6 +217,14 @@ export class IssuerService implements IssuerInterface {
         return { success: false, error: 'Already revoked' };
       }
       const blockchainResult = await this.blockchain.revokeCredOnChain(cred_id, reason);
+      // Unpin to stop distributing revoked credential
+      if (record.ipfs_cid) {
+        try {
+          await this.ipfs.unpin(record.ipfs_cid);
+        } catch (error) {
+          console.warn(`Failed to unpin ${record.ipfs_cid}:`, error);
+        }
+      }
       const { error: updateError } = await this.db
         .from(Tables.CREDENTIAL_RECORDS)
         .update({
@@ -267,6 +275,7 @@ export class IssuerService implements IssuerInterface {
   }
 
   async getAllCredentialsByHolder(holder_did: string): Promise<CredentialRecord[]> {
+    // await this.ipfs.fetch(cid, holder_did);
     const { data: records, error } = await this.db
       .from(Tables.CREDENTIAL_RECORDS)
       .select('*')
@@ -294,15 +303,6 @@ export class IssuerService implements IssuerInterface {
       credentials: records,
       total: count || 0,
     };
-  }
-
-  async uploadToIPFS(credential: Record<string, unknown>, holder_did: string) {
-    const cid = await this.ipfs.upload(credential, true, holder_did);
-    return { cid, encrypted: true };
-  }
-
-  async fetchFromIPFS(cid: string, holder_did: string) {
-    return await this.ipfs.fetch(cid, holder_did);
   }
 
   async validateCredSchema(credential_type: string, credential_subject: CredentialSubject) {

@@ -36,11 +36,6 @@ export interface IssuerInterface {
     credentials: CredentialRecord[];
     total: number;
   }>;
-  uploadToIPFS(credential: any, holder_did: string): Promise<{
-    cid: string;
-    encrypted: boolean; // AES-256-GCM
-  }>;
-  fetchFromIPFS(cid: string, holder_did: string): Promise<any>;
   validateCredSchema(credential_type: string, credential_subject: CredentialSubject): Promise<{
     valid: boolean;
     errors?: string[];
