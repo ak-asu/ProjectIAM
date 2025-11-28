@@ -91,7 +91,6 @@ export class IssuerService implements IssuerInterface {
       };
       const cred_hash = this.blockchain.hashCredential(verifiableCredential);
       const ipfs_cid = await this.ipfs.upload(verifiableCredential, true, prepared.holder_did);
-      await this.ipfs.pin(ipfs_cid);
       // Call Issuer Node to create merklized credential
       const issuerNodeResponse = await this.callIssuerNode({
         schema: schemaUrl,

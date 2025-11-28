@@ -60,26 +60,6 @@ export class IPFSService {
     return data.data || data;
   }
 
-  async pin(cid: string): Promise<boolean> {
-    const pinataUrl = `${config.ipfsApiUrl}/pinning/pinByHash`;
-    const response = await fetch(pinataUrl, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify({
-        hashToPin: cid,
-        pinataMetadata: {
-          name: `pinned-${Date.now()}`,
-        },
-      }),
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Pinata pin failed: ${response.status} - ${errorText}`);
-      return false;
-    }
-    return true;
-  }
-
   async unpin(cid: string): Promise<boolean> {
     const pinataUrl = `${config.ipfsApiUrl}/pinning/unpin/${cid}`;
     const response = await fetch(pinataUrl, {
