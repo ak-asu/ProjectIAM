@@ -44,10 +44,14 @@ export class IssuerController {
   getOffer = async (req: Request, res: Response) => {
     try {
       const { credId } = req.params;
-      const { holderDID } = req.query;
-      if (!holderDID || typeof holderDID !== 'string') {
-        res.status(400).json({ error: 'Holder DID required' });
-        return;
+      let holderDID = req.query.holderDID as string | undefined;
+      if (!holderDID) {
+        const credential = await this.issuerService.getCredential(credId);
+        if (!credential) {
+          res.status(404).json({ error: 'Credential not found' });
+          return;
+        }
+        holderDID = credential.holder_did;
       }
       const result = await this.issuerService.getCredOffer(credId, holderDID);
       res.json(result.offer);
