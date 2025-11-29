@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../../lib/api';
-import { CredentialRecord } from '../../lib/constants';
+import { CredentialRecord, API_BASE_URL } from '../../lib/constants';
 
 export default function AdminPortal() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -25,6 +25,7 @@ export default function AdminPortal() {
   });
   const [credentials, setCredentials] = useState<CredentialRecord[]>([]);
   const [revokeModal, setRevokeModal] = useState<{ credId: string; reason: string } | null>(null);
+  const [qrModal, setQrModal] = useState<{ credId: string; qrUrl: string; loading: boolean } | null>(null);
 
   const loadCredentials = async () => {
     try {
@@ -68,6 +69,12 @@ export default function AdminPortal() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleViewQR = (credId: string) => {
+    const offerUrl = `${API_BASE_URL}/api/issue/offer/${credId}`;
+    const qrCodeUrl = `iden3comm://?request_uri=${encodeURIComponent(offerUrl)}`;
+    setQrModal({ credId, qrUrl: qrCodeUrl, loading: false });
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -440,19 +447,27 @@ export default function AdminPortal() {
                                 )}
                               </td>
                               <td className="px-4 py-3">
-                                {!cred.is_revoked && (
+                                <div className="flex gap-3">
                                   <button
-                                    onClick={() => setRevokeModal({ credId: cred.id, reason: '' })}
-                                    className="text-red-400 hover:text-red-300 text-sm"
+                                    onClick={() => handleViewQR(cred.id)}
+                                    className="text-purple-400 hover:text-purple-300 text-sm"
                                   >
-                                    Revoke
+                                    View
                                   </button>
-                                )}
-                                {cred.is_revoked && cred.revocation_reason && (
-                                  <span className="text-xs text-gray-500" title={cred.revocation_reason}>
-                                    {cred.revocation_reason.substring(0, 20)}...
-                                  </span>
-                                )}
+                                  {!cred.is_revoked && (
+                                    <button
+                                      onClick={() => setRevokeModal({ credId: cred.id, reason: '' })}
+                                      className="text-red-400 hover:text-red-300 text-sm"
+                                    >
+                                      Revoke
+                                    </button>
+                                  )}
+                                  {cred.is_revoked && cred.revocation_reason && (
+                                    <span className="text-xs text-gray-500" title={cred.revocation_reason}>
+                                      {cred.revocation_reason.substring(0, 20)}...
+                                    </span>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -487,6 +502,38 @@ export default function AdminPortal() {
                         className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50"
                       >
                         {loading ? 'Revoking...' : 'Revoke'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {qrModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+                    <h3 className="text-xl font-bold text-white mb-4">Credential QR Code</h3>
+                    {qrModal.loading ? (
+                      <div className="flex justify-center items-center py-8">
+                        <div className="text-gray-300">Loading QR code...</div>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm text-gray-300 mb-4">
+                          Student can scan this QR with Privado ID to claim
+                        </p>
+                        <div className="bg-white p-4 rounded-lg flex justify-center">
+                          <QRCodeSVG value={qrModal.qrUrl} size={200} level="M" />
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2 text-center break-all">
+                          {qrModal.qrUrl}
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex justify-end gap-3 mt-4">
+                      <button
+                        onClick={() => setQrModal(null)}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500"
+                      >
+                        Close
                       </button>
                     </div>
                   </div>

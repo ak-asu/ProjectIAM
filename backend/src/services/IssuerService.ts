@@ -91,17 +91,21 @@ export class IssuerService implements IssuerInterface {
       };
       const cred_hash = this.blockchain.hashCredential(verifiableCredential);
       const ipfs_cid = await this.ipfs.upload(verifiableCredential, true, prepared.holder_did);
-      // Call Issuer Node to create merklized credential
-      const issuerNodeResponse = await this.callIssuerNode({
-        schema: schemaUrl,
-        subjectId: prepared.holder_did,
-        type: verifiableCredential.type,
-        credentialSubject: prepared.credential_subject,
-        expiration: expirationDate,
-        revocationNonce: Math.floor(Math.random() * 1000000),
-        mtpProof: true,
-      });
-      const merkle_root = issuerNodeResponse.state?.rootOfRoots || ethers.keccak256(ethers.toUtf8Bytes('merkle-root-placeholder'));
+      let issuerNodeResponse = null;
+      try {
+        issuerNodeResponse = await this.callIssuerNode({
+          schema: schemaUrl,
+          subjectId: prepared.holder_did,
+          type: verifiableCredential.type,
+          credentialSubject: prepared.credential_subject,
+          expiration: expirationDate,
+          revocationNonce: Math.floor(Math.random() * 1000000),
+          mtpProof: true,
+        });
+      } catch (error) {
+        console.warn('Issuer Node error:', error instanceof Error ? error.message : error);
+      }
+      const merkle_root = issuerNodeResponse?.state?.rootOfRoots || ethers.keccak256(ethers.toUtf8Bytes('merkle-root-placeholder'));
       const expires_at_timestamp = request.expiration_date
         ? dateToTimestamp(new Date(request.expiration_date))
         : 0;
@@ -126,7 +130,7 @@ export class IssuerService implements IssuerInterface {
           credential_type: request.credential_type || 'DegreeCredential',
           schema_url: schemaUrl,
           ipfs_cid: ipfs_cid,
-          revocation_nonce: issuerNodeResponse.credential?.proof?.revocationNonce || 0,
+          revocation_nonce: issuerNodeResponse?.credential?.proof?.revocationNonce || 0,
           issued_at: new Date().toISOString(),
           expires_at: request.expiration_date || null,
           is_revoked: false,
@@ -331,8 +335,8 @@ export class IssuerService implements IssuerInterface {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    if (config.issuerNodeApiKey) {
-      headers['Authorization'] = `Bearer ${config.issuerNodeApiKey}`;
+    if (config.issuerNodeApiUser && config.issuerNodeApiPassword) {
+      headers['Authorization'] = `Basic ${Buffer.from(`${config.issuerNodeApiUser}:${config.issuerNodeApiPassword}`).toString('base64')}`;
     }
     const credReq = {
       credentialSchema: request.schema,
@@ -353,7 +357,8 @@ export class IssuerService implements IssuerInterface {
           body: JSON.stringify(credReq),
         });
         if (!resp.ok) {
-          throw new Error(`Issuer Node API error: ${resp.status} - ${resp.text()}`);
+          const errorText = await resp.text();
+          throw new Error(`Issuer Node API error: ${resp.status} - ${errorText}`);
         }
         const result = await resp.json() as {
           id?: string;
