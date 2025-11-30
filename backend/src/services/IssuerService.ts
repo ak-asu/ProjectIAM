@@ -188,7 +188,8 @@ export class IssuerService implements IssuerInterface {
     if (record.holder_did !== holder_did) {
       throw new Error('Credential holder DID mismatch');
     }
-    const agentUrl = `${config.issuerNodeBaseUrl}/agent/credentials/${cred_id}`;
+    // backend endpoint to serve credential instead of ${config.issuerNodeBaseUrl}/agent/credentials/${cred_id} for now
+    const agentUrl = `${config.backendBaseUrl}/api/issue/fetch/${cred_id}`;
     const offer = createCredOffer(agentUrl, [
       {
         id: cred_id,
@@ -202,6 +203,22 @@ export class IssuerService implements IssuerInterface {
       qr_code_url: qrData.qrCodeUrl,
       qr_code_img: '',
     };
+  }
+
+  async fetchCredentialData(cred_id: string) {
+    const { data: record, error } = await this.db
+      .from(Tables.CREDENTIAL_RECORDS)
+      .select('*')
+      .eq('id', cred_id)
+      .single();
+    if (error || !record) {
+      throw new Error('Credential not found');
+    }
+    if (!record.ipfs_cid) {
+      throw new Error('Credential not stored in IPFS');
+    }
+    const cdata = await this.ipfs.fetch(record.ipfs_cid, record.holder_did);
+    return cdata;
   }
 
   async revokeCredential(cred_id: string, reason: string, revoked_by: string) {

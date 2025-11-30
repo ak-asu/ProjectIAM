@@ -100,6 +100,17 @@ export class IssuerController {
     }
   };
 
+  // for Privado ID to fetch actual cred
+  fetchCredential = async (req: Request, res: Response) => {
+    try {
+      const { credId } = req.params;
+      const result = await this.issuerService.fetchCredentialData(credId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(404).json({ error: error.message || 'Credential not found' });
+    }
+  };
+
   getAllCredentials = async (req: Request, res: Response) => {
     try {
       const limit = parseInt(req.query.limit as string) || 32;
