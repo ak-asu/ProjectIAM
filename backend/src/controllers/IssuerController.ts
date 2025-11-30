@@ -104,10 +104,34 @@ export class IssuerController {
   fetchCredential = async (req: Request, res: Response) => {
     try {
       const { credId } = req.params;
-      const result = await this.issuerService.fetchCredentialData(credId);
+      const threadId = req.query.thid as string | undefined;
+      const result = await this.issuerService.fetchCredentialData(credId, threadId);
       res.json(result);
     } catch (error: any) {
       res.status(404).json({ error: error.message || 'Credential not found' });
+    }
+  };
+
+  // Handle credential acceptance/rejection callback from wallet
+  handleCredCallback = async (req: Request, res: Response) => {
+    try {
+      const { credId } = req.query;
+      if (!credId || typeof credId !== 'string') {
+        res.status(400).json({ error: 'Credential ID needed' });
+        return;
+      }
+      const credResponse = req.body;
+      const result = await this.issuerService.handleCredentialCallback(credId, credResponse);
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(500).json(result);
+      }
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Credential callback failed',
+      });
     }
   };
 

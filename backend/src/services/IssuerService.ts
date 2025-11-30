@@ -10,7 +10,7 @@ import {
 } from '../helpers/db';
 import { getBlockchainService } from '../helpers/blockchain';
 import { getIPFSService } from '../helpers/ipfs';
-import { generateOfferQR, createCredOffer } from '../helpers/qr';
+import { generateOfferQR, createCredOffer, createCredFetchResponse } from '../helpers/qr';
 import { generateId, dateToTimestamp } from '../helpers/crypto';
 import { ethers } from 'ethers';
 import { config } from '../config';
@@ -188,6 +188,13 @@ export class IssuerService implements IssuerInterface {
     if (record.holder_did !== holder_did) {
       throw new Error('Credential holder DID mismatch');
     }
+    await this.db
+      .from(Tables.CREDENTIAL_RECORDS)
+      .update({
+        status: 'offered',
+        offered_at: new Date().toISOString(),
+      })
+      .eq('id', cred_id);
     // backend endpoint to serve credential instead of ${config.issuerNodeBaseUrl}/agent/credentials/${cred_id} for now
     const agentUrl = `${config.backendBaseUrl}/api/issue/fetch/${cred_id}`;
     const offer = createCredOffer(agentUrl, [
@@ -195,6 +202,7 @@ export class IssuerService implements IssuerInterface {
         id: cred_id,
         type: [record.credential_type],
         schema: record.schema_url,
+        description: `${record.credential_type} from ${config.issuerDID.split(':').pop()}`,
       },
     ]) as CredentialOffer;
     const qrData = generateOfferQR(agentUrl);
@@ -205,7 +213,7 @@ export class IssuerService implements IssuerInterface {
     };
   }
 
-  async fetchCredentialData(cred_id: string) {
+  async fetchCredentialData(cred_id: string, threadId?: string) {
     const { data: record, error } = await this.db
       .from(Tables.CREDENTIAL_RECORDS)
       .select('*')
@@ -217,8 +225,32 @@ export class IssuerService implements IssuerInterface {
     if (!record.ipfs_cid) {
       throw new Error('Credential not stored in IPFS');
     }
-    const cdata = await this.ipfs.fetch(record.ipfs_cid, record.holder_did);
-    return cdata;
+    await this.db
+      .from(Tables.CREDENTIAL_RECORDS)
+      .update({
+        status: 'fetched',
+        fetched_at: new Date().toISOString(),
+      })
+      .eq('id', cred_id);
+    // Fetch the actual credential from IPFS
+    const credentialData = await this.ipfs.fetch(record.ipfs_cid, record.holder_did);
+    // Add credentialStatus for revocation checking
+    const credentialWithStatus = {
+      ...credentialData,
+      credentialStatus: {
+        id: `${config.backendBaseUrl}/api/verify/check/${cred_id}`,
+        type: 'CredentialStatusList2021',
+        revocationListIndex: record.revocation_nonce,
+        revocationListCredential: `${config.backendBaseUrl}/api/verify/revocation-list`,
+      },
+    };
+    // Wrap in iden3comm fetch-response format
+    const fetchResponse = createCredFetchResponse(
+      credentialWithStatus,
+      record.holder_did,
+      threadId || cred_id
+    );
+    return fetchResponse;
   }
 
   async revokeCredential(cred_id: string, reason: string, revoked_by: string) {
@@ -429,5 +461,61 @@ export class IssuerService implements IssuerInterface {
       }
     }
     throw lastErr || new Error('Issuer Node API call failed after retries');
+  }
+
+  async handleCredentialCallback(cred_id: string, response: any) {
+    try {
+      const { data: record, error } = await this.db
+        .from(Tables.CREDENTIAL_RECORDS)
+        .select('*')
+        .eq('id', cred_id)
+        .single();
+      if (error || !record) {
+        throw new Error('Credential not found');
+      }
+      const isAccepted = response.type?.includes('ack') ||
+        response.body?.status === 'accepted' ||
+        !response.body?.status;
+      const updatedData: any = { status: isAccepted ? 'accepted' : 'rejected' };
+      if (isAccepted) {
+        updatedData.accepted_at = new Date().toISOString();
+      } else {
+        updatedData.rejection_reason = response.body?.description || 'User rejected credential';
+      }
+      const { error: updateError } = await this.db
+        .from(Tables.CREDENTIAL_RECORDS)
+        .update(updatedData)
+        .eq('id', cred_id);
+      if (updateError) {
+        throw new Error(`Failed to update credential: ${updateError.message}`);
+      }
+      await this.db
+        .from(Tables.AUDIT_LOGS)
+        .insert({
+          event_type: isAccepted ? 'CREDENTIAL_ACCEPTED' : 'CREDENTIAL_REJECTED',
+          entity_type: 'CREDENTIAL',
+          entity_id: cred_id,
+          actor: record.holder_did,
+          actor_type: 'HOLDER',
+          details: {
+            previous_status: record.status,
+            new_status: updatedData.status,
+            callback_type: response.type,
+          },
+        });
+      return {
+        success: true,
+        status: updatedData.status,
+        message: isAccepted
+          ? 'Credential accepted'
+          : 'Credential rejection',
+      };
+    } catch (error) {
+      console.error('Credential callback failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Callback failed',
+      };
+    }
   }
 }

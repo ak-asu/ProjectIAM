@@ -54,6 +54,11 @@ CREATE TABLE IF NOT EXISTS credential_records (
     revocation_reason TEXT,
     revoked_at TIMESTAMP WITH TIME ZONE,
     issued_by TEXT,
+    status VARCHAR(20) DEFAULT 'issued',
+    offered_at TIMESTAMP WITH TIME ZONE,
+    fetched_at TIMESTAMP WITH TIME ZONE,
+    accepted_at TIMESTAMP WITH TIME ZONE,
+    rejection_reason TEXT,
     FOREIGN KEY (student_id) REFERENCES users(student_id)
 );
 

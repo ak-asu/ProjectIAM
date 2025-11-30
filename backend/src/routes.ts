@@ -25,6 +25,7 @@ issuerRoutes.post('/prepare', authController.requireAdminAuth, issuerController.
 issuerRoutes.post('/credential', authController.requireAdminAuth, issuerController.issueCred);
 issuerRoutes.get('/offer/:credId', issuerController.getOffer); // Public - wallet needs to fetch
 issuerRoutes.get('/fetch/:credId', issuerController.fetchCredential); // Public - wallet fetches actual credential
+issuerRoutes.post('/callback', issuerController.handleCredCallback); // Public - wallet sends acceptance/rejection
 issuerRoutes.post('/revoke', authController.requireAdminAuth, issuerController.revokeCred);
 issuerRoutes.get('/credential/:credId', issuerController.getCredential); // Public - for viewing
 issuerRoutes.get('/credentials', authController.requireAdminAuth, issuerController.getAllCredentials);

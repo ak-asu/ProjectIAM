@@ -27,6 +27,11 @@ export interface CredentialRecord {
   revocation_reason: string | null;
   revoked_at: string | null;
   issued_by: string | null;
+  status?: 'issued' | 'offered' | 'fetched' | 'accepted' | 'rejected';
+  offered_at?: string | null;
+  fetched_at?: string | null;
+  accepted_at?: string | null;
+  rejection_reason?: string | null;
 }
 
 export interface VerificationSession {
@@ -121,7 +126,10 @@ export interface ProofResponse {
 }
 
 export interface CredentialOffer {
+  id: string;
+  typ: 'application/iden3comm-plain-json';
   type: 'https://iden3-communication.io/credentials/1.0/offer';
+  thid: string;
   body: {
     url: string;
     credentials: Array<{
@@ -131,6 +139,31 @@ export interface CredentialOffer {
       description?: string;
     }>;
   };
+  from: string;
+}
+
+export interface CredentialFetchResponse {
+  id: string;
+  typ: 'application/iden3comm-plain-json';
+  type: 'https://iden3-communication.io/credentials/1.0/fetch-response';
+  thid: string;
+  body: {
+    credential: any;
+  };
+  from: string;
+  to: string;
+}
+
+export interface CredentialAcknowledgment {
+  id: string;
+  typ: 'application/iden3comm-plain-json';
+  type: 'https://iden3-communication.io/credentials/1.0/ack' | 'https://iden3-communication.io/credentials/1.0/problem-report';
+  thid: string;
+  body: {
+    status?: 'accepted' | 'rejected';
+    description?: string;
+  };
+  from: string;
 }
 
 export interface IssuerNodeCredentialRequest {

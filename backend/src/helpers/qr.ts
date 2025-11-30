@@ -53,18 +53,40 @@ export function createAuthRequest(
 
 export function createCredOffer(
   offerUrl: string,
-  credentials: Array<{ id: string; type: string[]; schema: string }>
+  credentials: Array<{ id: string; type: string[]; schema: string; description?: string }>
+) {
+  const reqId = generateRequestId();
+  return {
+    id: reqId,
+    typ: 'application/iden3comm-plain-json',
+    type: 'https://iden3-communication.io/credentials/1.0/offer',
+    thid: reqId,
+    body: {
+      url: offerUrl,
+      credentials: credentials.map(cred => ({
+        ...cred,
+        description: cred.description || `${cred.type[cred.type.length - 1]} credential`,
+      })),
+    },
+    from: config.issuerDID,
+  };
+}
+
+export function createCredFetchResponse(
+  credential: any,
+  holderDID: string,
+  threadId: string
 ) {
   return {
     id: generateRequestId(),
     typ: 'application/iden3comm-plain-json',
-    type: 'https://iden3-communication.io/credentials/1.0/offer',
-    thid: generateRequestId(),
+    type: 'https://iden3-communication.io/credentials/1.0/fetch-response',
+    thid: threadId,
     body: {
-      url: offerUrl,
-      credentials,
+      credential,
     },
     from: config.issuerDID,
+    to: holderDID,
   };
 }
 
