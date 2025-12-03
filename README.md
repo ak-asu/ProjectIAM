@@ -127,9 +127,12 @@ git clone https://github.com/ak-asu/ProjectIAM.git
 cd ProjectIAM
 ```
 
-2. **Install all dependencies in each workspace**
+2. **Install all dependencies in each workspace (backend, frontend, contracts)**
 ```bash
-npm install
+cd backend && npm install
+cd ../frontend && npm install
+cd ../contracts && npm install
+cd ..
 ```
 
 3. **Set up environment variables**
@@ -142,16 +145,12 @@ cp backend/.env.sample backend/.env
 cp frontend/.env.sample frontend/.env
 cp contracts/.env.sample contracts/.env
 ```
+Put your values and keep updating as we move forward in the setup.
 
 4. **Set up the database**
 
-Run Prisma (ORM) migrations to create the database tables:
-```bash
-cd backend
-npx prisma migrate dev
-npx prisma generate
-cd ..
-```
+Create a new Supabase project and get the connection URL and API keys.
+Run bacend/schema.sql to create all tables in Supabase SQL Editor.
 
 5. **Compile and deploy smart contracts**
 
@@ -161,41 +160,46 @@ cd contracts
 npx hardhat compile
 ```
 
-Then deploy to Amoy testnet:
+Then deploy to Amoy testnet (cheap and fast instead of mainnet):
 ```bash
 npx hardhat run scripts/deploy.js --network amoy
 ```
+Check the output in contracts/deployments/amoy-deploy.json.
+Add them to your backend and frontend `.env` files.
 
-Save the deployed contract addresses and add them to your backend and frontend `.env` files.
+6. **Start the development servers in separate terminals**
 
-6. **Start the development servers**
-
-From the root directory, start both backend and frontend:
 ```bash
+cd frontend
 npm run dev
 ```
 
-Or run them separately:
 ```bash
-npm run dev --workspace=backend
-npm run dev --workspace=frontend
+cd backend
+npm run dev
 ```
 
-The frontend will be available at `http://localhost:3000`
+The frontend will be available at `http://localhost:3000` or your specified port.
 
 ### Testing
 
 ```bash
-npm run test:backend
-npm run test:contracts
+cd contracts
+npm run test
 ```
+
+```bash
+cd backend
+npx ts-node test-lifecycle.ts
+```
+Dummy data can be found in end of backend/schema.sql
 
 ### Deployment
 
 1. Update environment variables for production endpoints
 2. Deploy smart contracts to Polygon mainnet
-3. Build the frontend: `npm run build --workspace=frontend`
-4. Deploy backend and frontend to Vercel
+3. Deploy frontend on Vercel
+4. Deploy backend on Render
 5. Update CORS settings and ensure all endpoints use HTTPS
 
 ### Security Considerations
