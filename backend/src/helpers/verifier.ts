@@ -128,25 +128,6 @@ export function didFromId(id: string, blockchain = 'polygon', network = 'amoy'):
   }
 }
 
-export function validateProofReq(proofReq: any): boolean {
-  if (!proofReq || typeof proofReq !== 'object') {
-    return false;
-  }
-  const required = ['type', 'body'];
-  for (const field of required) {
-    if (!(field in proofReq)) {
-      return false;
-    }
-  }
-  if (proofReq.type !== 'https://iden3-communication.io/proofs/1.0/request') {
-    return false;
-  }
-  if (!proofReq.body.callbackUrl || !proofReq.body.scope || !Array.isArray(proofReq.body.scope)) {
-    return false;
-  }
-  return true;
-}
-
 export function validateProofResp(proofResp: any): boolean {
   if (!proofResp || typeof proofResp !== 'object') {
     return false;

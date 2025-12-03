@@ -24,5 +24,5 @@ export const config = {
     ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
     : ['*'],
   enableZkProof: process.env.ENABLE_ZK_PROOF !== 'false',
-  stateContractAddress: process.env.STATE_CONTRACT_ADDRESS || '',
+  stateContractAddress: process.env.STATE_CONTRACT_ADDRESS || '0x1a4cc30f2aa0377b0c3bc9848766d90cb4404124',
 };

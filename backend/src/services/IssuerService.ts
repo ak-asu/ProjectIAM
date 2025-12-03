@@ -134,7 +134,7 @@ export class IssuerService implements IssuerInterface {
       }
       const isOldStateGenesis = oldRootBigInt === 0n;
       // Publish State to Polygon ID State Contract. makes the credential verifiable by the Privado ID App
-      if (process.env.ENABLE_ZK_PROOF === 'true') {
+      if (config.enableZkProof) {
         try {
           console.log('Starting state transition (ZK Proof generation)...');
           const provider = new ethers.JsonRpcProvider(config.rpcUrl);

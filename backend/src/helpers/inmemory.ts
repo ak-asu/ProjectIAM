@@ -2,7 +2,7 @@ import { IDataSource } from '@0xpolygonid/js-sdk';
 import { IMerkleTreeStorage, IdentityMerkleTreeMetaInformation, MerkleTreeType } from '@0xpolygonid/js-sdk';
 import { Merkletree, InMemoryDB, str2Bytes } from '@iden3/js-merkletree';
 
-export class InMemoryStroage<T> implements IDataSource<T> {
+export class InMemoryStorage<T> implements IDataSource<T> {
   private data: Map<string, T> = new Map();
 
   async get(key: string): Promise<T | undefined> {
@@ -70,11 +70,11 @@ export class InMemoryMerkleTree implements IMerkleTreeStorage {
     for (const t of types) {
         const oldtreeId = oldIdentifier + '+' + t.toString();
         const newtreeId = newIdentifier + '+' + t.toString();
-        const item = this.trees.get(oldtreeId);
-        if (item) {
-            this.trees.set(newtreeId, { ...item, identifier: newIdentifier });
+      const item = this.trees.get(oldtreeId);
+      if (item) {
+        this.trees.set(newtreeId, { ...item, identifier: newIdentifier });
             this.trees.delete(oldtreeId); // Generally for binding move ownership
-        }
+      }
     }
   }
 }

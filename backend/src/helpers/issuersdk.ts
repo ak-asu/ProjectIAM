@@ -19,7 +19,7 @@ import {
 } from '@0xpolygonid/js-sdk';
 import { config } from '../config';
 import * as crypto from 'crypto';
-import { InMemoryStroage, InMemoryMerkleTree } from './inmemory';
+import { InMemoryStorage, InMemoryMerkleTree } from './inmemory';
 import { CircuitsFs } from './circuitsfs';
 
 
@@ -39,11 +39,11 @@ export class IssuerSDK {
       chainId: config.chainId,
     };
     const credStorage = new CredentialStorage(
-      new InMemoryStroage<W3CCredential>()
+      new InMemoryStorage<W3CCredential>()
     );
     const identityStorage = new IdentityStorage(
-      new InMemoryStroage<Identity>(),
-      new InMemoryStroage<Profile>()
+      new InMemoryStorage<Identity>(),
+      new InMemoryStorage<Profile>()
     );
     const mtStorage = new InMemoryMerkleTree(40);
     const ethStorage = new EthStateStorage(ethConf);
@@ -111,10 +111,7 @@ export class IssuerSDK {
         this.issuerDID = String(did);
       }
       if (!this.issuerDID || this.issuerDID === '[object Object]') {
-        throw new Error('Failed to generate IssuerDID, [object Object]');
-      }
-      if (!this.issuerDID) {
-        throw new Error('Failed to generate IssuerDID, string');
+        throw new Error('Failed to generate IssuerDID');
       }
       console.log('Issuer identity initialized:', this.issuerDID);
       return this.issuerDID;

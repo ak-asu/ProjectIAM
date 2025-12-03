@@ -148,18 +148,6 @@ export class BlockchainService {
     const jsonString = JSON.stringify(credentialData);
     return ethers.keccak256(ethers.toUtf8Bytes(jsonString));
   }
-
-  async waitForTransaction(txHash: string, confirmations = 1) {
-    return await this.provider.waitForTransaction(txHash, confirmations);
-  }
-
-  async getBlockNumber() {
-    return await this.provider.getBlockNumber();
-  }
-
-  async getGasPrice() {
-    return await this.provider.getFeeData().then((data) => data.gasPrice || 0n);
-  }
 }
 
 let blockchainService: BlockchainService | null = null;
