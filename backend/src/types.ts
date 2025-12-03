@@ -166,17 +166,6 @@ export interface CredentialAcknowledgment {
   from: string;
 }
 
-export interface IssuerNodeCredentialRequest {
-  schema: string;
-  subjectId: string;
-  type: string[];
-  credentialSubject: Record<string, any>;
-  expiration?: string | null;
-  revocationNonce?: number;
-  signatureProof?: boolean;
-  mtpProof?: boolean;
-}
-
 export interface VerificationPolicy {
   allowedIssuers: string[];
   credentialType: string;

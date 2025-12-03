@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS credential_records (
     credential_type TEXT NOT NULL,
     schema_url TEXT NOT NULL,
     ipfs_cid TEXT NOT NULL,
-    revocation_nonce INTEGER NOT NULL,
+    revocation_nonce BIGINT NOT NULL,
     issued_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE,
     is_revoked BOOLEAN DEFAULT FALSE NOT NULL,

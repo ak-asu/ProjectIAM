@@ -1,5 +1,3 @@
-import { config } from '../config';
-
 export interface QRCodeData {
   qrCodeUrl: string;
   qrCodeImg?: string;
@@ -34,6 +32,7 @@ export function generateProofRequestQR(backendBaseUrl: string, verifyId: string)
 export function createAuthRequest(
   callbackUrl: string,
   nonce: string,
+  issuerDID: string,
   reason?: string
 ) {
   return {
@@ -47,13 +46,14 @@ export function createAuthRequest(
       message: nonce,
       scope: [],
     },
-    from: config.issuerDID,
+    from: issuerDID,
   };
 }
 
 export function createCredOffer(
   offerUrl: string,
-  credentials: Array<{ id: string; type: string[]; schema: string; description?: string }>
+  credentials: Array<{ id: string; type: string[]; schema: string; description?: string }>,
+  issuerDID: string
 ) {
   const reqId = generateRequestId();
   return {
@@ -68,14 +68,15 @@ export function createCredOffer(
         description: cred.description || `${cred.type[cred.type.length - 1]} credential`,
       })),
     },
-    from: config.issuerDID,
+    from: issuerDID,
   };
 }
 
 export function createCredFetchResponse(
   credential: any,
   holderDID: string,
-  threadId: string
+  threadId: string,
+  issuerDID: string
 ) {
   return {
     id: generateRequestId(),
@@ -85,7 +86,7 @@ export function createCredFetchResponse(
     body: {
       credential,
     },
-    from: config.issuerDID,
+    from: issuerDID,
     to: holderDID,
   };
 }
@@ -95,11 +96,13 @@ export function createProofRequest(
   reason: string,
   allowedIssuers: string[],
   credentialType: string,
-  constraints?: Record<string, any>
+  issuerDID: string,
+  constraints?: Record<string, any>,
+  contextUrl?: string
 ) {
   const query: any = {
     allowedIssuers,
-    context: 'https://www.w3.org/2018/credentials/v1',
+    context: contextUrl || 'https://www.w3.org/2018/credentials/v1',
     type: credentialType,
   };
   if (constraints) {
@@ -121,7 +124,7 @@ export function createProofRequest(
         },
       ],
     },
-    from: config.issuerDID,
+    from: issuerDID,
   };
 }
 

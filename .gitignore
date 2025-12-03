@@ -60,6 +60,3 @@ build/
 tempdata/
 
 *.zip
-*.zkey
-*.wasm
-*.r1cs

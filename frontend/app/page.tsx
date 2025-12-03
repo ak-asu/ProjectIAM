@@ -62,9 +62,6 @@ export default function Home() {
             </div>
           </Link>
         </div>
-        <footer className="mt-12 text-center text-sm text-gray-400">
-          <p className="mt-2">Unicredify 2025</p>
-        </footer>
       </div>
     </div>
   );

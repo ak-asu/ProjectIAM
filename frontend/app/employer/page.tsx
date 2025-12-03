@@ -14,10 +14,11 @@ export default function EmployerPortal() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [verifyForm, setVerifyForm] = useState({
-    university: '',
+    studentId: '',
     degree: '',
     major: '',
     minGraduationYear: '',
+    minGpa: '',
   });
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [verifyResult, setVerifyResult] = useState<VerificationResult | null>(null);
@@ -90,14 +91,14 @@ export default function EmployerPortal() {
     setVerifyResult(null);
     try {
       const policy = {
-        allowedIssuers: [process.env.NEXT_PUBLIC_ISSUER_DID || ''],
+        allowedIssuers: [],
         credentialType: 'DegreeCredential',
         constraints: [
-          ...(verifyForm.university
+          ...(verifyForm.studentId
             ? [{
-              field: 'credentialSubject.university',
+              field: 'credentialSubject.studentId',
               operator: '$eq' as const,
-              value: verifyForm.university,
+              value: verifyForm.studentId,
             }]
             : []),
           ...(verifyForm.degree
@@ -119,6 +120,13 @@ export default function EmployerPortal() {
               field: 'credentialSubject.graduationYear',
               operator: '$gte' as const,
               value: parseInt(verifyForm.minGraduationYear),
+            }]
+            : []),
+          ...(verifyForm.minGpa
+            ? [{
+              field: 'credentialSubject.gpa',
+              operator: '$gte' as const,
+              value: parseFloat(verifyForm.minGpa),
             }]
             : []),
         ],
@@ -284,24 +292,19 @@ export default function EmployerPortal() {
                   </h2>
                   {!qrCodeUrl && (
                     <form onSubmit={handleCreateVerification} className="space-y-6">
-                      <div className="bg-blue-900 border border-blue-700 rounded-lg p-4 mb-6">
-                        <p className="text-sm text-blue-300">
-                          Specify what credentials to verify (all optional), generate a QR code, and get instant verification via zero-knowledge proof
-                        </p>
-                      </div>
                       <div className="grid md:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-gray-300 mb-2 font-semibold">
-                            University
+                            Student ID
                           </label>
                           <input
                             type="text"
-                            value={verifyForm.university}
+                            value={verifyForm.studentId}
                             onChange={(e) =>
-                              setVerifyForm({ ...verifyForm, university: e.target.value })
+                              setVerifyForm({ ...verifyForm, studentId: e.target.value })
                             }
                             className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
-                            placeholder="Any university"
+                            placeholder="e.g., STU001"
                           />
                         </div>
                         <div>
@@ -354,6 +357,26 @@ export default function EmployerPortal() {
                             placeholder="2020"
                             min="1900"
                             max={new Date().getFullYear() + 10}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-300 mb-2 font-semibold">
+                            Minimum GPA
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={verifyForm.minGpa}
+                            onChange={(e) =>
+                              setVerifyForm({
+                                ...verifyForm,
+                                minGpa: e.target.value,
+                              })
+                            }
+                            className="w-full px-4 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white"
+                            placeholder="3.0"
+                            min="0.0"
+                            max="4.0"
                           />
                         </div>
                       </div>
@@ -452,46 +475,46 @@ export default function EmployerPortal() {
                           <tr>
                             <th className="px-4 py-3 text-gray-300 font-semibold">Date</th>
                             <th className="px-4 py-3 text-gray-300 font-semibold">Status</th>
-                            <th className="px-4 py-3 text-gray-300 font-semibold">Holder</th>
+                            <th className="px-4 py-3 text-gray-300 font-semibold">Student ID</th>
                             <th className="px-4 py-3 text-gray-300 font-semibold">Result</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-700">
-                          {verificationHistory.map((session) => (
-                            <tr key={session.id} className="hover:bg-gray-750">
-                              <td className="px-4 py-3 text-gray-400 text-sm">
-                                {new Date(session.created_at).toLocaleString()}
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className={`px-2 py-1 text-xs rounded ${
-                                  session.status === 'verified'
-                                    ? 'bg-green-900 text-green-200'
-                                    : session.status === 'rejected'
-                                    ? 'bg-red-900 text-red-200'
-                                    : 'bg-yellow-900 text-yellow-200'
-                                }`}>
-                                  {session.status}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-gray-300 text-sm">
-                                {session.result?.holder_did
-                                  ? `${session.result.holder_did.substring(0, 25)}...`
-                                  : '-'}
-                              </td>
-                              <td className="px-4 py-3">
-                                {session.result?.verified !== undefined && (
-                                  session.result.verified ? (
-                                    <span className="text-green-400 text-sm">Valid</span>
+                          {verificationHistory.map((session) => {
+                            const attrs = session.result?.disclosed_attributes as Record<string, any> | undefined;
+                            const studentId = (attrs?.studentId || attrs?.student_id) as string | undefined;
+                            return (
+                              <tr key={session.id} className="hover:bg-gray-750">
+                                <td className="px-4 py-3 text-gray-400 text-sm">
+                                  {new Date(session.created_at).toLocaleString()}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`px-2 py-1 text-xs rounded ${session.status === 'verified'
+                                      ? 'bg-green-900 text-green-200'
+                                      : session.status === 'rejected'
+                                        ? 'bg-red-900 text-red-200'
+                                        : 'bg-yellow-900 text-yellow-200'
+                                    }`}>
+                                    {session.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-gray-300 text-sm">
+                                  {studentId || '-'}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {session.result?.verified !== undefined ? (
+                                    session.result.verified ? (
+                                      <span className="text-green-400 text-sm">Valid</span>
+                                    ) : (
+                                      <span className="text-red-400 text-sm">Invalid</span>
+                                    )
                                   ) : (
-                                    <span className="text-red-400 text-sm">Invalid</span>
-                                  )
-                                )}
-                                {session.result?.verified === undefined && (
-                                  <span className="text-gray-500 text-sm">Pending</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
+                                    <span className="text-gray-500 text-sm">Pending</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

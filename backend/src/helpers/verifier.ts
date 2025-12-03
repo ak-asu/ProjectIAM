@@ -1,7 +1,8 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import { getBlockchainService } from './blockchain';
-import { config } from '../config';
 import * as snarkjs from 'snarkjs';
+import { core } from '@0xpolygonid/js-sdk';
 
 export interface ZKProof {
   type: string;
@@ -53,7 +54,7 @@ export async function proofVerification(
     if (!proof || !proof.proof || !proof.pub_signals || !proof.proof.pi_a || !proof.proof.pi_b || !proof.proof.pi_c) {
       return { verified: false, errors: ['Invalid proof'] };
     }
-    const vKeyPath = verificationKeyPath || config.verificationKeyPath;
+    const vKeyPath = verificationKeyPath || path.join(__dirname, '../../circuits/credentialAtomicQuerySigV2.json');
     const vKeyContent = fs.readFileSync(vKeyPath, 'utf-8');
     const vKey: VerificationKeyData = JSON.parse(vKeyContent);
     const tempProof = {
@@ -81,7 +82,7 @@ export function claimsFromPubSignals(publicSigs: string[]): Record<string, any> 
   // Polygon ID credentialAtomicQuerySigV2 circuit public signals layout
   // Index 0: 1 if credential is merklized
   // Index 1: holder's identity
-  // Index 4: issuer's claim non-revocation state
+  // Index 4: issuer's id
   // Index 5: hash of the claim schema
   // Index 6: index of the claim field being queried
   // Index 7: query operator: 0=noop, 1=eq, 2=lt, 3=gt, 4=in, 5=nin
@@ -91,9 +92,8 @@ export function claimsFromPubSignals(publicSigs: string[]): Record<string, any> 
   // Index 76: verification requester
   if (publicSigs.length > 0) claims.merklized = publicSigs[0] === '1';
   if (publicSigs.length > 1) claims.userID = publicSigs[1];
-  if (publicSigs.length > 2) claims.issuerID = publicSigs[2];
   if (publicSigs.length > 3) claims.issuerAuthState = publicSigs[3];
-  if (publicSigs.length > 4) claims.issuerClaimNonRevState = publicSigs[4];
+  if (publicSigs.length > 4) claims.issuerID = publicSigs[4];
   if (publicSigs.length > 5) claims.claimSchema = publicSigs[5];
   if (publicSigs.length > 6) claims.slotIndex = parseInt(publicSigs[6], 10);
   if (publicSigs.length > 7) claims.operator = parseInt(publicSigs[7], 10);
@@ -103,11 +103,29 @@ export function claimsFromPubSignals(publicSigs: string[]): Record<string, any> 
   if (publicSigs.length > 74) claims.claimPathKey = publicSigs[74];
   if (publicSigs.length > 75) claims.claimPathNotExists = publicSigs[75] === '1';
   if (publicSigs.length > 76) claims.requestID = publicSigs[76];
+  // timestamp detection for varying circuit layouts)
+  const now = Math.floor(Date.now() / 1000);
+  for (let i = 0; i < publicSigs.length; i++) {
+      const val = parseInt(publicSigs[i], 10);
+      // value is a reasonable timestamp (last 24 hours or next 1 hour)
+      if (val > now - 86400 && val < now + 3600) {
+          claims.timestamp = publicSigs[i];
+          break;
+      }
+  }
   return claims;
 }
 
 export function didFromId(id: string, blockchain = 'polygon', network = 'amoy'): string {
-  return `did:polygonid:${blockchain}:${network}:${id}`;
+  try {
+    const idInt = BigInt(id);
+    const coreId = core.Id.fromBigInt(idInt);
+    const did = core.DID.parseFromId(coreId);
+    return did.string();
+  } catch (e) {
+    console.warn(`Failed to convert ${id} to DID`, e);
+    return `did:iden3:${blockchain}:${network}:${id}`;
+  }
 }
 
 export function validateProofReq(proofReq: any): boolean {
@@ -171,7 +189,7 @@ export async function validatePublicSignals(
     const now = Math.floor(Date.now() / 1000);
     const maxAge = 3600; // 1 hour
     if (now - proofTime > maxAge) {
-      errors.push('Proof timestamp is too old');
+      errors.push(`Proof timestamp issue, diff of ${now - proofTime}s`);
     }
   }
   return {

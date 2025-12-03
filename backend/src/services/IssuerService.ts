@@ -6,19 +6,22 @@ import {
   CredentialSubject,
   CredentialOffer,
   CredentialRecord,
-  IssuerNodeCredentialRequest,
 } from '../helpers/db';
 import { getBlockchainService } from '../helpers/blockchain';
 import { getIPFSService } from '../helpers/ipfs';
 import { generateOfferQR, createCredOffer, createCredFetchResponse } from '../helpers/qr';
-import { generateId, dateToTimestamp } from '../helpers/crypto';
+import { dateToTimestamp } from '../helpers/crypto';
 import { ethers } from 'ethers';
 import { config } from '../config';
+import { IssuerSDK } from '../helpers/issuersdk';
+import { CredentialStatusType, core } from '@0xpolygonid/js-sdk';
+import { didFromId } from '../helpers/verifier';
 
 export class IssuerService implements IssuerInterface {
   private db = getSupabaseClient();
   private blockchain = getBlockchainService();
   private ipfs = getIPFSService();
+  private sdk = IssuerSDK.getInstance();
 
   async prepareCred(request: PrepareCredentialRequest) {
     let student_id: string;
@@ -56,9 +59,14 @@ export class IssuerService implements IssuerInterface {
     if (studentError || !student) {
       throw new Error('Student record not found in university database');
     }
+    if (holder_did && !holder_did.startsWith('did:')) {
+      holder_did = didFromId(holder_did);
+    }
     const credential_subject: CredentialSubject = {
       ...request.credential_subject,
       id: holder_did,
+      studentId: student_id,
+      type: request.credential_type || 'DegreeCredential',
     };
     return {
       student_id,
@@ -72,40 +80,80 @@ export class IssuerService implements IssuerInterface {
   async issueCred(request: PrepareCredentialRequest) {
     try {
       const prepared = await this.prepareCred(request);
-      const issuerDID = config.issuerDID;
-      const schemaUrl = config.schemaUrl;
-      const cred_id = generateId();
-      const issuanceDate = new Date().toISOString();
-      const expirationDate = request.expiration_date || null;
-      const verifiableCredential = {
-        '@context': [
-          'https://www.w3.org/2018/credentials/v1',
-          'https://schema.iden3.io/core/jsonld/iden3proofs.jsonld',
-        ],
-        id: `urn:uuid:${cred_id}`,
-        type: ['VerifiableCredential', request.credential_type || 'DegreeCredential'],
-        issuer: issuerDID,
-        issuanceDate,
-        expirationDate,
-        credentialSubject: prepared.credential_subject,
-      };
-      const cred_hash = this.blockchain.hashCredential(verifiableCredential);
-      const ipfs_cid = await this.ipfs.upload(verifiableCredential, true, prepared.holder_did);
-      let issuerNodeResponse = null;
-      try {
-        issuerNodeResponse = await this.callIssuerNode({
-          schema: schemaUrl,
-          subjectId: prepared.holder_did,
-          type: verifiableCredential.type,
-          credentialSubject: prepared.credential_subject,
-          expiration: expirationDate,
-          revocationNonce: Math.floor(Math.random() * 1000000),
-          mtpProof: true,
-        });
-      } catch (error) {
-        console.warn('Issuer Node error:', error instanceof Error ? error.message : error);
+      const issuerDID = await this.sdk.initIdentity();
+      if (!issuerDID || typeof issuerDID !== 'string' || !issuerDID.startsWith('did:')) {
+          throw new Error(`Invalid Issuer DID from SDK: ${issuerDID}`);
       }
-      const merkle_root = issuerNodeResponse?.state?.rootOfRoots || ethers.keccak256(ethers.toUtf8Bytes('merkle-root-placeholder'));
+      const issuer_did = core.DID.parse(issuerDID);
+      const claimReq = {
+        credentialSchema: config.schemaUrl,
+        type: request.credential_type || 'DegreeCredential',
+        credentialSubject: prepared.credential_subject,
+        expiration: request.expiration_date ? Math.floor(new Date(request.expiration_date).getTime() / 1000) : undefined,
+        revocationOpts: {
+          type: CredentialStatusType.Iden3ReverseSparseMerkleTreeProof,
+          id: 'https://rhs-staging.polygonid.me'
+        }
+      };
+      const issuedCred = await this.sdk.identityWallet.issueCredential(issuer_did, claimReq);
+      // Extract UUID from URN or use the ID as is. issuedCred.id is generally "urn:uuid:...".
+      const cred_id_parts = issuedCred.id.split(':');
+      const cred_id = cred_id_parts[cred_id_parts.length - 1];
+      const mtResult = await this.sdk.identityWallet.addCredentialsToMerkleTree(
+        [issuedCred], issuer_did
+      );
+      // Convert rootOfRoots to BigInt then to 32-byte hex string for the contract
+      const rootVal = mtResult.newTreeState.rootOfRoots;
+      let rootBigInt: bigint;
+      if (typeof rootVal === 'bigint') {
+        rootBigInt = rootVal;
+      } else if (typeof rootVal === 'object' && rootVal !== null && 'bigInt' in rootVal && typeof (rootVal as any).bigInt === 'function') {
+        rootBigInt = (rootVal as any).bigInt();
+      } else {
+        try {
+            rootBigInt = BigInt(rootVal.toString());
+        } catch (e) {
+            console.error('Failed to convert rootOfRoots to BigInt:', e);
+            throw new Error(`Invalid Merkle Root value: ${rootVal}`);
+        }
+      }      
+      const merkle_root = ethers.toBeHex(rootBigInt, 32);
+      const oldRootVal = mtResult.oldTreeState.rootOfRoots;
+      let oldRootBigInt: bigint;
+      if (typeof oldRootVal === 'bigint') {
+        oldRootBigInt = oldRootVal;
+      } else if (typeof oldRootVal === 'object' && oldRootVal !== null && 'bigInt' in oldRootVal && typeof (oldRootVal as any).bigInt === 'function') {
+        oldRootBigInt = (oldRootVal as any).bigInt();
+      } else {
+        try {
+            oldRootBigInt = BigInt(oldRootVal.toString());
+        } catch (e) {
+            console.warn('Failed to convert oldRootOfRoots to BigInt, assuming 0:', e);
+            oldRootBigInt = 0n;
+        }
+      }
+      const isOldStateGenesis = oldRootBigInt === 0n;
+      // Publish State to Polygon ID State Contract. makes the credential verifiable by the Privado ID App
+      if (process.env.ENABLE_ZK_PROOF === 'true') {
+        try {
+          console.log('Starting state transition (ZK Proof generation)...');
+          const provider = new ethers.JsonRpcProvider(config.rpcUrl);
+          const wallet = new ethers.Wallet(config.issuerPrivateKey, provider);
+          // SDK expects an ethers Signer to send the transaction
+          const txId = await this.sdk.proofService.transitState(
+            issuer_did,
+            mtResult.oldTreeState,
+            isOldStateGenesis,
+            this.sdk.stateStorage,
+            wallet as any
+          );
+          console.log('State transition published:', txId);
+        } catch (error) {
+          console.warn('Failed to publish ZK Proof', error);
+        }
+      }
+      const cred_hash = this.blockchain.hashCredential(issuedCred);
+      const ipfs_cid = await this.ipfs.upload(issuedCred, true, prepared.holder_did);
       const expires_at_timestamp = request.expiration_date
         ? dateToTimestamp(new Date(request.expiration_date))
         : 0;
@@ -128,9 +176,9 @@ export class IssuerService implements IssuerInterface {
           student_id: prepared.student_id,
           issuer_did: issuerDID,
           credential_type: request.credential_type || 'DegreeCredential',
-          schema_url: schemaUrl,
+          schema_url: config.schemaUrl,
           ipfs_cid: ipfs_cid,
-          revocation_nonce: issuerNodeResponse?.credential?.proof?.revocationNonce || 0,
+          revocation_nonce: issuedCred.credentialStatus.revocationNonce || 0,
           issued_at: new Date().toISOString(),
           expires_at: request.expiration_date || null,
           is_revoked: false,
@@ -158,7 +206,7 @@ export class IssuerService implements IssuerInterface {
       const offerQRData = generateOfferQR(offerUrl);
       return {
         success: true,
-        cred_id: blockchainResult.credId,
+        cred_id: cred_id, // DB ID (UUID), not the blockchain ID
         tx_hash: blockchainResult.txHash,
         merkle_root,
         ipfs_cid,
@@ -195,16 +243,16 @@ export class IssuerService implements IssuerInterface {
         offered_at: new Date().toISOString(),
       })
       .eq('id', cred_id);
-    // backend endpoint to serve credential instead of ${config.issuerNodeBaseUrl}/agent/credentials/${cred_id} for now
+    const issuer_did = await this.sdk.initIdentity();
     const agentUrl = `${config.backendBaseUrl}/api/issue/fetch/${cred_id}`;
     const offer = createCredOffer(agentUrl, [
       {
         id: cred_id,
         type: [record.credential_type],
         schema: record.schema_url,
-        description: `${record.credential_type} from ${config.issuerDID.split(':').pop()}`,
+        description: `${record.credential_type} from ${issuer_did.split(':').pop()}`,
       },
-    ]) as CredentialOffer;
+    ], issuer_did) as CredentialOffer;
     const qrData = generateOfferQR(agentUrl);
     return {
       offer,
@@ -232,23 +280,14 @@ export class IssuerService implements IssuerInterface {
         fetched_at: new Date().toISOString(),
       })
       .eq('id', cred_id);
-    // Fetch the actual credential from IPFS
-    const credentialData = await this.ipfs.fetch(record.ipfs_cid, record.holder_did);
-    // Add credentialStatus for revocation checking
-    const credentialWithStatus = {
-      ...credentialData,
-      credentialStatus: {
-        id: `${config.backendBaseUrl}/api/verify/check/${cred_id}`,
-        type: 'CredentialStatusList2021',
-        revocationListIndex: record.revocation_nonce,
-        revocationListCredential: `${config.backendBaseUrl}/api/verify/revocation-list`,
-      },
-    };
-    // Wrap in iden3comm fetch-response format
+    const cred_data = await this.ipfs.fetch(record.ipfs_cid, record.holder_did);
+    const issuerDID = await this.sdk.initIdentity();
+    // iden3comm fetch-response format
     const fetchResponse = createCredFetchResponse(
-      credentialWithStatus,
+      cred_data,
       record.holder_did,
-      threadId || cred_id
+      threadId || cred_id,
+      issuerDID
     );
     return fetchResponse;
   }
@@ -375,92 +414,6 @@ export class IssuerService implements IssuerInterface {
       valid: errors.length === 0,
       errors: errors.length > 0 ? errors : undefined,
     };
-  }
-
-  private async callIssuerNode(request: IssuerNodeCredentialRequest) {
-    const parts = config.issuerDID.split(':');
-    const issuerIdentifier = parts[parts.length - 1];
-    const apiUrl = `${config.issuerNodeBaseUrl}/v2/identities/${issuerIdentifier}/credentials`;
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (config.issuerNodeApiUser && config.issuerNodeApiPassword) {
-      headers['Authorization'] = `Basic ${Buffer.from(`${config.issuerNodeApiUser}:${config.issuerNodeApiPassword}`).toString('base64')}`;
-    }
-    const credReq = {
-      credentialSchema: request.schema,
-      type: Array.isArray(request.type) ? request.type[request.type.length - 1] : request.type,
-      credentialSubject: request.credentialSubject,
-      expiration: request.expiration ? new Date(request.expiration).getTime() : null,
-      mtProof: request.mtpProof ?? true,
-      signatureProof: true,
-      revocationNonce: request.revocationNonce,
-    };
-    let lastErr: Error | null = null;
-    const maxRetries = 2;
-    for (let retry = 1; retry <= maxRetries; retry++) {
-      try {
-        const resp = await fetch(apiUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(credReq),
-        });
-        if (!resp.ok) {
-          const errorText = await resp.text();
-          throw new Error(`Issuer Node API error: ${resp.status} - ${errorText}`);
-        }
-        const result = await resp.json() as {
-          id?: string;
-          credentialSubject?: Record<string, any>;
-          issuanceDate?: string;
-          revNonce?: number;
-          mtp?: { existence: boolean; siblings: string[] };
-          proof?: {
-            mtp?: { siblings: string[] };
-            issuer?: {
-              claimsTreeRoot?: string;
-              revocationTreeRoot?: string;
-              rootOfRoots?: string;
-              state?: string;
-            };
-            txId?: string;
-          };
-        };
-        const credId = result.id || `credential-${Date.now()}`;
-        return {
-          id: credId,
-          credential: {
-            '@context': result.credentialSubject?.['@context'] || ['https://www.w3.org/2018/credentials/v1'],
-            id: credId,
-            type: request.type,
-            issuer: config.issuerDID,
-            issuanceDate: result.issuanceDate || new Date().toISOString(),
-            credentialSubject: result.credentialSubject || request.credentialSubject,
-            proof: {
-              revocationNonce: result.revNonce || request.revocationNonce || 0,
-            },
-          },
-          mtp: result.mtp || {
-            existence: true,
-            siblings: result.proof?.mtp?.siblings || [],
-          },
-          state: {
-            claimsTreeRoot: result.proof?.issuer?.claimsTreeRoot || ethers.keccak256(ethers.toUtf8Bytes(`claims-${credId}`)),
-            revocationTreeRoot: result.proof?.issuer?.revocationTreeRoot || ethers.keccak256(ethers.toUtf8Bytes(`revocation-${credId}`)),
-            rootOfRoots: result.proof?.issuer?.rootOfRoots || ethers.keccak256(ethers.toUtf8Bytes(`roots-${credId}`)),
-            state: result.proof?.issuer?.state || ethers.keccak256(ethers.toUtf8Bytes(`state-${credId}`)),
-            txId: result.proof?.txId || '',
-          },
-        };
-      } catch (error) {
-        lastErr = error instanceof Error ? error : new Error(String(error));
-        console.error(`Issuer Node API failed:`, lastErr.message);
-        if (retry < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * retry));
-        }
-      }
-    }
-    throw lastErr || new Error('Issuer Node API call failed after retries');
   }
 
   async handleCredentialCallback(cred_id: string, response: any) {

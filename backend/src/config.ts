@@ -10,10 +10,7 @@ export const config = {
   contractAddr: process.env.CONTRACT_ADDRESS || '',
   issuerPrivateKey: process.env.ISSUER_PRIVATE_KEY || '',
   chainId: parseInt(process.env.CHAIN_ID || '80002'),
-  issuerDID: process.env.ISSUER_DID || '',
-  issuerNodeBaseUrl: process.env.ISSUER_NODE_BASE_URL || '',
-  issuerNodeApiUser: process.env.ISSUER_NODE_API_USER || '',
-  issuerNodeApiPassword: process.env.ISSUER_NODE_API_PASSWORD || '',
+  issuerSeed: process.env.ISSUER_SEED || 'pseudounicredifyrandomphrase',
   backendBaseUrl: process.env.BACKEND_BASE_URL || 'http://localhost:3001',
   sessionTTLMin: parseInt(process.env.SESSION_TTL_MIN || '15'),
   verifySessionTTLMin: parseInt(process.env.VERIFY_SESSION_TTL_MIN || '10'),
@@ -23,8 +20,9 @@ export const config = {
   schemaUrl: process.env.SCHEMA_URL || '',
   encryptionSecret: process.env.ENCRYPTION_SECRET || '',
   adminApiKey: process.env.ADMIN_API_KEY || '',
-  verificationKeyPath: process.env.VERIFICATION_KEY_PATH || '',
   corsOrigin: process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
-    : ['*']
+    : ['*'],
+  enableZkProof: process.env.ENABLE_ZK_PROOF !== 'false',
+  stateContractAddress: process.env.STATE_CONTRACT_ADDRESS || '',
 };

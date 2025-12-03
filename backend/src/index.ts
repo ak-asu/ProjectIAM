@@ -9,12 +9,18 @@ import { checkDbConnection } from './helpers/db';
 import { authRoutes, issuerRoutes, verifierRoutes } from './routes';
 import { AuthService } from './services/AuthService';
 import { VerifierService } from './services/VerifierService';
+import path from 'path';
+import fs from 'fs';
 
 const app = express();
 
 // Added for render.io
 app.set('trust proxy', 1);
 app.use(helmet()); // For security headers
+
+let schemas = path.join(__dirname, process.env.NODE_ENV === 'production' ? '../..' : '..', 'schemas');
+schemas = fs.existsSync(schemas) ? schemas : path.join(process.cwd(), 'schemas');
+app.use('/schemas', express.static(schemas));
 
 app.use(
   cors({

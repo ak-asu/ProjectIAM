@@ -23,12 +23,14 @@ import {
   validatePublicSignals,
 } from '../helpers/verifier';
 import { config } from '../config';
+import { IssuerSDK } from '../helpers/issuersdk';
 
 export class VerifierService implements VerifierInterface {
   private db = getSupabaseClient();
   private blockchain = getBlockchainService();
 
   async createVerifySession(policy: VerificationPolicy, verifier_id?: string) {
+    policy.allowedIssuers = [await IssuerSDK.getInstance().initIdentity()];
     const verify_id = generateId();
     const expires_at = timestampToDate(getFutureTimestamp(config.verifySessionTTLMin));
     const callback_url = `${config.backendBaseUrl}/api/verify/callback?verifyId=${verify_id}`;
@@ -247,12 +249,15 @@ export class VerifierService implements VerifierInterface {
       acc[constraint.field] = { [constraint.operator]: constraint.value };
       return acc;
     }, {} as Record<string, Record<string, unknown>>);
+    const issuerDID = await IssuerSDK.getInstance().initIdentity();
     return createProofRequest(
       callback_url,
       'Verify your credential',
       policy.allowedIssuers,
       policy.credentialType,
-      constraints
+      issuerDID,
+      constraints,
+      policy.schemaUrl
     ) as ProofRequest;
   }
 

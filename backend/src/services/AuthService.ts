@@ -12,6 +12,7 @@ import { generateNonce, generateId, getFutureTimestamp, timestampToDate, generat
 import { generateAuthQR, createAuthRequest, validateIden3commResp, extractDIDFromResp } from '../helpers/qr';
 import * as bcrypt from 'bcrypt';
 import { config } from '../config';
+import { IssuerSDK } from '../helpers/issuersdk';
 
 interface PortalSession {
   userId: string;
@@ -78,8 +79,9 @@ export class AuthService implements AuthInterface {
     if (new Date() > new Date(session.expires_at)) {
       throw new Error('Session expired');
     }
+    const issuerDID = await IssuerSDK.getInstance().initIdentity();
     const callbackUrl = `${config.backendBaseUrl}/api/auth/callback?sessionId=${session_id}`;
-    return createAuthRequest(callbackUrl, session.nonce, 'Authenticate with your DID') as AuthorizationRequest;
+    return createAuthRequest(callbackUrl, session.nonce, issuerDID, 'Authenticate with DID') as AuthorizationRequest;
   }
 
   async handleAuthCallback(session_id: string, response: AuthorizationResponse) {
