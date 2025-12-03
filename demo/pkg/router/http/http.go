@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -87,9 +88,29 @@ func (h Handlers) apiRouters(r *chi.Mux) {
 }
 
 func (h Handlers) schemaRouters(r *chi.Mux) {
-	// Serve schema files from /schemas directory
+	// Serve schema files from /schemas directory with correct Content-Type headers
 	fileServer := http.FileServer(http.Dir("./schemas"))
-	r.Handle("/schemas/*", http.StripPrefix("/schemas", fileServer))
+	r.Handle("/schemas/*", http.StripPrefix("/schemas", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set correct Content-Type based on file extension
+		if strings.HasSuffix(r.URL.Path, ".jsonld") {
+			w.Header().Set("Content-Type", "application/ld+json")
+		} else if strings.HasSuffix(r.URL.Path, ".json") {
+			w.Header().Set("Content-Type", "application/json")
+		} else if strings.HasSuffix(r.URL.Path, ".md") {
+			w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		}
+		// Enable CORS for schema files
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		fileServer.ServeHTTP(w, r)
+	})))
 }
 
 func (h Handlers) verificationRouters(r *chi.Mux) {

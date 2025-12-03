@@ -46,6 +46,8 @@ type Config struct {
 	KeysDirPath string `envconfig:"KEYS_DIR_PATH" default:"./keys"`
 
 	IPFSURL string `envconfig:"IPFS_URL" default:"https://ipfs.io"`
+
+	DegreeJSONLDContextURL string `envconfig:"DEGREE_JSONLD_CONTEXT_URL" required:"true"`
 }
 
 type Log struct {

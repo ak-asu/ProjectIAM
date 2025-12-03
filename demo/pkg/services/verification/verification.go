@@ -20,18 +20,20 @@ var (
 
 // VerificationService handles credential verification requests and proof validation
 type VerificationService struct {
-	verifier    *auth.Verifier // Reuses the same verifier as authentication
-	callbackURL string          // Base callback URL for this service
-	verifierDID string          // The verifier's DID (required in authorization requests)
+	verifier           *auth.Verifier // Reuses the same verifier as authentication
+	callbackURL        string          // Base callback URL for this service
+	verifierDID        string          // The verifier's DID (required in authorization requests)
+	jsonLdContextURL   string          // JSON-LD context URL for credential verification
 }
 
 // NewVerificationService creates a new verification service
 // It reuses the existing auth.Verifier to validate ZKP proofs and check blockchain state
-func NewVerificationService(verifier *auth.Verifier, callbackURL, verifierDID string) *VerificationService {
+func NewVerificationService(verifier *auth.Verifier, callbackURL, verifierDID, jsonLdContextURL string) *VerificationService {
 	return &VerificationService{
-		verifier:    verifier,
-		callbackURL: callbackURL,
-		verifierDID: verifierDID,
+		verifier:         verifier,
+		callbackURL:      callbackURL,
+		verifierDID:      verifierDID,
+		jsonLdContextURL: jsonLdContextURL,
 	}
 }
 
@@ -64,6 +66,10 @@ func (v *VerificationService) CreateVerificationRequest(
 	// Generate a unique session ID for this verification request
 	//nolint:gosec // this is not a security issue, just for demo session tracking
 	sessionID = strconv.Itoa(rand.Intn(10000000))
+
+	// Use the configured JSON-LD context URL from environment variable
+	// CRITICAL: The ZKP query requires the JSON-LD context URL, not the JSON schema URL
+	fmt.Printf("[VERIFICATION] Using configured JSON-LD context URL: %s\n", v.jsonLdContextURL)
 
 	// Build the callback URL with session ID
 	// The wallet will POST the ZKP proof to this URL
@@ -120,7 +126,7 @@ func (v *VerificationService) CreateVerificationRequest(
 		CircuitID: "credentialAtomicQueryMTPV2OnChain",
 		Query: map[string]interface{}{
 			"allowedIssuers": []string{"*"}, // Accept credentials from any issuer (can be restricted to specific DIDs)
-			"context":        verificationReq.SchemaURL,
+			"context":        v.jsonLdContextURL, // CRITICAL: Must use JSON-LD context URL from config, not JSON schema URL
 			"type":           verificationReq.CredentialType,
 		},
 	}

@@ -152,6 +152,7 @@ func newHTTPServer(
 		authverifier,
 		cfg.ExternalHost+"/api/v1/verification/callback",
 		verifierDID,
+		cfg.DegreeJSONLDContextURL,
 	)
 
 	// init handlers

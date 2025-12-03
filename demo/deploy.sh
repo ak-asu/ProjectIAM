@@ -78,7 +78,7 @@ echo "  Identity contract: $IDENTITY_ADDRESS"
 echo ""
 
 echo -e "${YELLOW}Step 5: Generating issuer DID from contract address...${NC}"
-ISSUER_DID=$(go run utils/convertor.go --contract_address="$IDENTITY_ADDRESS" --network=privado --chain=test | grep -o 'did:iden3:[^[:space:]]*')
+ISSUER_DID=$(go run utils/convertor.go --contract_address="$IDENTITY_ADDRESS" --network=privado --chain=main | grep -o 'did:iden3:[^[:space:]]*')
 echo -e "${GREEN}✓ Issuer DID generated: $ISSUER_DID${NC}"
 echo ""
 
@@ -86,11 +86,11 @@ echo -e "${YELLOW}Step 6: Detecting Docker bridge gateway IP...${NC}"
 # Dynamically detect Docker bridge gateway IP for the compose network
 COMPOSE_PROJECT_NAME=$(basename "$SCRIPT_DIR")
 DOCKER_NETWORK="${COMPOSE_PROJECT_NAME}_default"
-DOCKER_GATEWAY_IP=$(docker network inspect "$DOCKER_NETWORK" --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null)
+DOCKER_GATEWAY_IP=$(timeout 3 docker network inspect "$DOCKER_NETWORK" --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "")
 
 # Fallback to default bridge if compose network doesn't exist yet
 if [ -z "$DOCKER_GATEWAY_IP" ]; then
-    DOCKER_GATEWAY_IP=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null)
+    DOCKER_GATEWAY_IP=$(timeout 3 docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "")
 fi
 
 # Final fallback to common default
@@ -106,13 +106,12 @@ echo -e "${YELLOW}Step 7: Configuring environment variables...${NC}"
 # Update .env file with deployed addresses
 cat > .env <<EOL
 # State contract addresses for different networks
-# Hardhat runs on chain 31337, but DIDs use chain 21000 (privado:main) and 21001 (privado:test)
-# Both chain IDs point to the same Hardhat node for local development
-SUPPORTED_STATE_CONTRACTS="21000=$STATE_ADDRESS,21001=$STATE_ADDRESS"
+# Hardhat runs on chain 31337, mapped to chain 21000 (privado:main) for DID operations
+SUPPORTED_STATE_CONTRACTS="21000=$STATE_ADDRESS"
 
 # RPC endpoints - using localhost Hardhat node
 # Using Docker bridge network gateway to reach host (auto-detected: $DOCKER_GATEWAY_IP)
-SUPPORTED_RPC="21000=http://$DOCKER_GATEWAY_IP:8545,21001=http://$DOCKER_GATEWAY_IP:8545"
+SUPPORTED_RPC="21000=http://$DOCKER_GATEWAY_IP:8545"
 
 # Issuer private key - using Hardhat's first default account
 # IdentityExample contract deployed at: $IDENTITY_ADDRESS
@@ -131,6 +130,9 @@ DEMO_MODE="true"
 
 # Credential schemas - using backend API endpoint via ngrok
 NEXT_PUBLIC_DEGREE_SCHEMA_URL="https://unincisive-bruce-exemplarily.ngrok-free.dev/schemas/degree-credential-schema.json"
+
+# JSON-LD context URL for verification requests
+DEGREE_JSONLD_CONTEXT_URL="https://unincisive-bruce-exemplarily.ngrok-free.dev/schemas/degree-credential-context.jsonld"
 EOL
 
 # Create .env.local for Next.js build-time environment variables
