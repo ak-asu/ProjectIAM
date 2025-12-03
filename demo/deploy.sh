@@ -26,9 +26,9 @@ echo -e "${YELLOW}Step 2: Cleaning up old data...${NC}"
 # Remove Docker volumes
 docker volume prune -f >/dev/null 2>&1 || true
 # Remove old log files
-rm -f hardhat.log schema-server.log
+rm -f hardhat.log
 # Remove old PID files
-rm -f hardhat.pid schema-server.pid
+rm -f hardhat.pid
 echo -e "${GREEN}✓ Old data cleaned up${NC}"
 echo ""
 
@@ -52,26 +52,7 @@ echo "  Waiting for Hardhat to be ready..."
 sleep 5
 echo ""
 
-echo -e "${YELLOW}Step 4: Starting fresh schema HTTP server...${NC}"
-# Kill any existing schema server
-if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-    EXISTING_PID=$(lsof -Pi :8000 -sTCP:LISTEN -t)
-    kill $EXISTING_PID 2>/dev/null || true
-    sleep 1
-    echo "  Stopped existing schema server (PID: $EXISTING_PID)"
-fi
-
-echo "  Starting schema HTTP server in background..."
-cd schemas
-nohup python3 -m http.server 8000 --bind 0.0.0.0 > ../schema-server.log 2>&1 &
-SCHEMA_PID=$!
-echo $SCHEMA_PID > ../schema-server.pid
-cd ..
-echo -e "${GREEN}✓ Schema HTTP server started (PID: $SCHEMA_PID)${NC}"
-sleep 2
-echo ""
-
-echo -e "${YELLOW}Step 5: Deploying smart contracts to Hardhat...${NC}"
+echo -e "${YELLOW}Step 4: Deploying smart contracts to Hardhat...${NC}"
 cd contracts
 echo "  Deploying contracts..."
 npx hardhat run scripts/deployIdentityExampleLocalhost.ts --network localhost
@@ -96,22 +77,42 @@ echo "  State contract: $STATE_ADDRESS"
 echo "  Identity contract: $IDENTITY_ADDRESS"
 echo ""
 
-echo -e "${YELLOW}Step 6: Generating issuer DID from contract address...${NC}"
+echo -e "${YELLOW}Step 5: Generating issuer DID from contract address...${NC}"
 ISSUER_DID=$(go run utils/convertor.go --contract_address="$IDENTITY_ADDRESS" --network=privado --chain=test | grep -o 'did:iden3:[^[:space:]]*')
 echo -e "${GREEN}✓ Issuer DID generated: $ISSUER_DID${NC}"
+echo ""
+
+echo -e "${YELLOW}Step 6: Detecting Docker bridge gateway IP...${NC}"
+# Dynamically detect Docker bridge gateway IP for the compose network
+COMPOSE_PROJECT_NAME=$(basename "$SCRIPT_DIR")
+DOCKER_NETWORK="${COMPOSE_PROJECT_NAME}_default"
+DOCKER_GATEWAY_IP=$(docker network inspect "$DOCKER_NETWORK" --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null)
+
+# Fallback to default bridge if compose network doesn't exist yet
+if [ -z "$DOCKER_GATEWAY_IP" ]; then
+    DOCKER_GATEWAY_IP=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null)
+fi
+
+# Final fallback to common default
+if [ -z "$DOCKER_GATEWAY_IP" ]; then
+    DOCKER_GATEWAY_IP="172.17.0.1"
+    echo -e "${YELLOW}  Using default gateway IP: $DOCKER_GATEWAY_IP${NC}"
+else
+    echo -e "${GREEN}✓ Detected Docker gateway IP: $DOCKER_GATEWAY_IP${NC}"
+fi
 echo ""
 
 echo -e "${YELLOW}Step 7: Configuring environment variables...${NC}"
 # Update .env file with deployed addresses
 cat > .env <<EOL
 # State contract addresses for different networks
-# Hardhat runs on chain 31337, but DIDs use chain 21001 (privado:test)
-# Both chain IDs point to the same Hardhat node
-SUPPORTED_STATE_CONTRACTS="21001=$STATE_ADDRESS"
+# Hardhat runs on chain 31337, but DIDs use chain 21000 (privado:main) and 21001 (privado:test)
+# Both chain IDs point to the same Hardhat node for local development
+SUPPORTED_STATE_CONTRACTS="21000=$STATE_ADDRESS,21001=$STATE_ADDRESS"
 
 # RPC endpoints - using localhost Hardhat node
-# Using Docker bridge network gateway to reach host
-SUPPORTED_RPC="21001=http://172.21.0.1:8545"
+# Using Docker bridge network gateway to reach host (auto-detected: $DOCKER_GATEWAY_IP)
+SUPPORTED_RPC="21000=http://$DOCKER_GATEWAY_IP:8545,21001=http://$DOCKER_GATEWAY_IP:8545"
 
 # Issuer private key - using Hardhat's first default account
 # IdentityExample contract deployed at: $IDENTITY_ADDRESS
@@ -128,8 +129,8 @@ EXTERNAL_HOST="https://unincisive-bruce-exemplarily.ngrok-free.dev"
 # Demo mode - skip DID verification for testing (set to "false" for production)
 DEMO_MODE="true"
 
-# Credential schemas
-NEXT_PUBLIC_DEGREE_SCHEMA_URL="http://172.21.0.1:8000/degree-credential-schema.json"
+# Credential schemas - using backend API endpoint via ngrok
+NEXT_PUBLIC_DEGREE_SCHEMA_URL="https://unincisive-bruce-exemplarily.ngrok-free.dev/schemas/degree-credential-schema.json"
 EOL
 
 # Create .env.local for Next.js build-time environment variables
@@ -184,8 +185,8 @@ echo -e "${GREEN}=========================================${NC}"
 echo ""
 echo "Services are running:"
 echo "  • Hardhat node:      http://localhost:8545"
-echo "  • Schema server:     http://localhost:8000"
 echo "  • Backend API:       http://localhost:8080"
+echo "  • Backend Schemas:   http://localhost:8080/schemas/ (public via ngrok)"
 echo "  • Frontend:          http://localhost:3000"
 echo ""
 echo "To check logs:"

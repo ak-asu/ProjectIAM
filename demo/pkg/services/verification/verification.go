@@ -42,7 +42,7 @@ func NewVerificationService(verifier *auth.Verifier, callbackURL, verifierDID st
 // - Which fields to disclose (reveal actual values)
 type VerificationRequest struct {
 	CredentialType string                 `json:"credentialType"` // e.g., "DegreeCredential"
-	SchemaURL      string                 `json:"schemaUrl"`      // e.g., "http://172.21.0.1:8000/degree-credential-schema.json"
+	SchemaURL      string                 `json:"schemaUrl"`      // e.g., "https://your-ngrok-url.ngrok-free.dev/schemas/degree-credential-schema.json"
 	Query          map[string]interface{} `json:"query"`          // Fields with operators, e.g., {"graduationYear": {"$gt": 2020}}
 	Disclose       []string               `json:"disclose"`       // Fields to reveal, e.g., ["name", "degree", "university"]
 }

@@ -30,7 +30,7 @@ func NewVerificationHandlers(verificationService *verification.VerificationServi
 //
 //	{
 //	  "credentialType": "DegreeCredential",
-//	  "schemaUrl": "http://172.21.0.1:8000/degree-credential-schema.json",
+//	  "schemaUrl": "https://your-ngrok-url.ngrok-free.dev/schemas/degree-credential-schema.json",
 //	  "query": {
 //	    "graduationYear": {"$gt": 2020}  // ZK proof without revealing exact value
 //	  },

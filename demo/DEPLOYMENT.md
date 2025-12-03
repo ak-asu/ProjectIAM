@@ -22,10 +22,13 @@ Run the deployment script to start all services:
 This script will:
 1. Stop and remove any existing containers
 2. Start the Hardhat blockchain node (if not already running)
-3. Start the schema HTTP server (if not already running)
-4. Build and start all Docker containers (MongoDB, Backend, Frontend)
-5. Wait for all services to be ready
-6. Display the URLs for accessing the services
+3. Deploy smart contracts to the local Hardhat network
+4. Auto-detect Docker bridge gateway IP for Hardhat connectivity
+5. Generate issuer DID from deployed contract
+6. Configure environment variables with detected IPs
+7. Build and start all Docker containers (MongoDB, Backend, Frontend)
+8. Wait for all services to be ready
+9. Display the URLs for accessing the services
 
 ### Shutdown Everything
 
@@ -38,7 +41,7 @@ To stop all services:
 This script will:
 1. Stop and remove all Docker containers
 2. Stop the Hardhat node
-3. Stop the schema HTTP server
+3. Clean up log and PID files
 
 
 ### 4. Expose Backend to Public Network
@@ -61,8 +64,8 @@ After deployment, the following services will be available:
 
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8080
+- **Backend Schemas**: http://localhost:8080/schemas/
 - **Hardhat Node**: http://localhost:8545
-- **Schema Server**: http://localhost:8000
 - **MongoDB**: localhost:27017
 
 ## Environment Variables
@@ -70,12 +73,14 @@ After deployment, the following services will be available:
 Key environment variables in `.env`:
 
 - `SUPPORTED_STATE_CONTRACTS`: State contract addresses for different networks
-- `SUPPORTED_RPC`: RPC endpoints for blockchain networks
+- `SUPPORTED_RPC`: RPC endpoints for blockchain networks (Docker gateway IP auto-detected by deploy.sh)
 - `ISSUERS_PRIVATE_KEY`: Issuer's DID and private key
 - `MONGODB_CONNECTION_STRING`: MongoDB connection string
 - `EXTERNAL_HOST`: Public URL for QR code generation (use ngrok URL)
 - `DEMO_MODE`: Set to "true" to skip DID verification for testing
-- `NEXT_PUBLIC_DEGREE_SCHEMA_URL`: URL for the degree credential schema
+- `NEXT_PUBLIC_DEGREE_SCHEMA_URL`: URL for the degree credential schema (served via backend API at /schemas/ endpoint)
+
+**Note:** The `deploy.sh` script automatically detects the Docker bridge gateway IP and configures the RPC endpoint accordingly. This ensures Hardhat connectivity works regardless of Docker network configuration.
 
 ## Testing the Demo
 
@@ -109,9 +114,6 @@ docker-compose logs -f client
 
 # Hardhat node
 tail -f hardhat.log
-
-# Schema server
-tail -f schema-server.log
 ```
 
 ### Check Service Status
@@ -134,9 +136,9 @@ docker-compose up -d --build <service-name>
 
 ### Common Issues
 
-1. **Port already in use**: Make sure no other services are using ports 3000, 8000, 8080, 8545, or 27017
+1. **Port already in use**: Make sure no other services are using ports 3000, 8080, 8545, or 27017
 2. **Docker containers not starting**: Check logs with `docker-compose logs`
-3. **Schema not found error**: Verify the schema HTTP server is running on port 8000
+3. **Schema not found error**: Verify the backend API is running and schemas are accessible at http://localhost:8080/schemas/
 4. **Blockchain connection error**: Ensure Hardhat node is running on port 8545
 
 ## Clean Up

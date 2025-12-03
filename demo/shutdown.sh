@@ -49,30 +49,8 @@ else
 fi
 echo ""
 
-echo -e "${YELLOW}Step 4: Stopping schema HTTP server...${NC}"
-if [ -f schema-server.pid ]; then
-    SCHEMA_PID=$(cat schema-server.pid)
-    if ps -p $SCHEMA_PID > /dev/null 2>&1; then
-        kill $SCHEMA_PID
-        echo -e "${GREEN}✓ Schema HTTP server stopped (PID: $SCHEMA_PID)${NC}"
-    else
-        echo -e "${YELLOW}Schema HTTP server (PID: $SCHEMA_PID) is not running${NC}"
-    fi
-    rm schema-server.pid
-else
-    # Try to kill by port if PID file doesn't exist
-    if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-        SCHEMA_PID=$(lsof -Pi :8000 -sTCP:LISTEN -t)
-        kill $SCHEMA_PID
-        echo -e "${GREEN}✓ Schema HTTP server stopped (PID: $SCHEMA_PID)${NC}"
-    else
-        echo -e "${YELLOW}Schema HTTP server is not running${NC}"
-    fi
-fi
-echo ""
-
-echo -e "${YELLOW}Step 5: Cleaning up old log files...${NC}"
-rm -f hardhat.log schema-server.log
+echo -e "${YELLOW}Step 4: Cleaning up old log files...${NC}"
+rm -f hardhat.log
 echo -e "${GREEN}✓ Log files removed${NC}"
 echo ""
 
