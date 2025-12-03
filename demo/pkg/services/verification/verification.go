@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	auth "github.com/iden3/go-iden3-auth/v2"
 	"github.com/iden3/iden3comm/v2/protocol"
 	"github.com/patrickmn/go-cache"
@@ -23,14 +22,16 @@ var (
 type VerificationService struct {
 	verifier    *auth.Verifier // Reuses the same verifier as authentication
 	callbackURL string          // Base callback URL for this service
+	verifierDID string          // The verifier's DID (required in authorization requests)
 }
 
 // NewVerificationService creates a new verification service
 // It reuses the existing auth.Verifier to validate ZKP proofs and check blockchain state
-func NewVerificationService(verifier *auth.Verifier, callbackURL string) *VerificationService {
+func NewVerificationService(verifier *auth.Verifier, callbackURL, verifierDID string) *VerificationService {
 	return &VerificationService{
 		verifier:    verifier,
 		callbackURL: callbackURL,
+		verifierDID: verifierDID,
 	}
 }
 
@@ -92,6 +93,24 @@ func (v *VerificationService) CreateVerificationRequest(
 		}
 	}
 
+	// Create the base authorization request using the helper function
+	// This ensures all required fields are properly set
+	reason := fmt.Sprintf("Verify your %s credential", verificationReq.CredentialType)
+	request = auth.CreateAuthorizationRequest(reason, v.verifierDID, callbackURLWithSession)
+
+	// CRITICAL FIX 1: Set the From field to the verifier's DID
+	// This is required for the wallet to know who is requesting verification
+	request.From = v.verifierDID
+
+	// CRITICAL FIX 2: In iden3comm protocol, for initial requests, ID and ThreadID must be the same value
+	// This is required for proper message threading between wallet request/response flow
+	// The CreateAuthorizationRequest function may generate separate UUIDs, so we must sync them
+	// Note: The sessionID for tracking this verification is in the callbackURL query parameter
+	if request.ID != "" {
+		// Use the generated ID for both fields to ensure they match
+		request.ThreadID = request.ID
+	}
+
 	// Build the ZKP query for the credential
 	// This defines what the wallet needs to prove
 	zkpQuery := protocol.ZeroKnowledgeProofRequest{
@@ -111,20 +130,8 @@ func (v *VerificationService) CreateVerificationRequest(
 		zkpQuery.Query["credentialSubject"] = credentialSubject
 	}
 
-	// Create the iden3comm authorization request message
-	// This is what gets encoded in the QR code
-	request = protocol.AuthorizationRequestMessage{
-		ID:       uuid.New().String(),
-		Typ:      "application/iden3comm-plain-json",
-		Type:     protocol.AuthorizationRequestMessageType, // "https://iden3-communication.io/authorization/1.0/request"
-		ThreadID: uuid.New().String(),
-		Body: protocol.AuthorizationRequestMessageBody{
-			CallbackURL: callbackURLWithSession,
-			Reason:      fmt.Sprintf("Verify your %s credential", verificationReq.CredentialType),
-			Scope:       []protocol.ZeroKnowledgeProofRequest{zkpQuery},
-		},
-		From: "", // Verifier DID (optional for basic verification)
-	}
+	// Append the ZKP query to the request scope
+	request.Body.Scope = append(request.Body.Scope, zkpQuery)
 
 	// Store the request in cache for later validation in callback
 	// When the wallet sends the proof, we'll retrieve this to validate against

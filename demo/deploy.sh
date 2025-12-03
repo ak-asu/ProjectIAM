@@ -133,8 +133,9 @@ NEXT_PUBLIC_DEGREE_SCHEMA_URL="http://172.21.0.1:8000/degree-credential-schema.j
 EOL
 
 # Create .env.local for Next.js build-time environment variables
+# IMPORTANT: Must use public URL so mobile wallets can access the schema
 cat > client/.env.local <<EOL
-NEXT_PUBLIC_DEGREE_SCHEMA_URL=http://172.21.0.1:8000/degree-credential-schema.json
+NEXT_PUBLIC_DEGREE_SCHEMA_URL=https://unincisive-bruce-exemplarily.ngrok-free.dev/schemas/degree-credential-schema.json
 EOL
 echo -e "${GREEN}✓ Environment configured${NC}"
 echo ""

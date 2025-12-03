@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import SelectedIssuerContext from '@/contexts/SelectedIssuerContext';
 
 
-const SelectedIssuerProvider = ({ children }: { children: React.JSX.Element }) => {
+const SelectedIssuerProvider = ({ children }: { children: React.ReactNode }) => {
     const [selectedIssuerContext, setSelectedIssuerContext] = useState('');
 
     return (

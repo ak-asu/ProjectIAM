@@ -137,9 +137,21 @@ func newHTTPServer(
 		credentialRepository,
 		issuerService,
 	)
+	// Get the first issuer DID to use as the verifier DID
+	// In a production system, you might want to have a separate verifier DID
+	var verifierDID string
+	for did := range sanitizePrivateKeys(privateKeys) {
+		verifierDID = did
+		break
+	}
+	if verifierDID == "" {
+		logger.Fatal("No issuer DID found in configuration")
+	}
+
 	verificationService := verification.NewVerificationService(
 		authverifier,
 		cfg.ExternalHost+"/api/v1/verification/callback",
+		verifierDID,
 	)
 
 	// init handlers
