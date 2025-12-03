@@ -196,7 +196,17 @@ async function main() {
       credential
     }, null, 2));
   }
-  console.log('[Step 5] Credential subject data:', JSON.stringify(credential.credentialSubject, null, 2));
+  console.log('[Step 5] Credential details:');
+  console.log('  - Credential ID:', credential.id);
+  console.log('  - Issuer:', credential.issuer);
+  console.log('  - Issuance Date:', credential.issuanceDate);
+  console.log('  - Expiration Date:', credential.expirationDate);
+  console.log('  - Credential Type:', credential.type);
+  console.log('  - Subject Data:', JSON.stringify(credential.credentialSubject, null, 2));
+  if (credential.credentialStatus) {
+    console.log('  - Status Type:', credential.credentialStatus.type);
+    console.log('  - Status ID:', credential.credentialStatus.id);
+  }
 
   console.log('[Step 6] Holder saving credential to wallet');
   const w3cCredential = W3CCredential.fromJSON(credential);
@@ -218,8 +228,13 @@ async function main() {
   console.log('[Step 7] Employer ID:', CONFIG.employerId);
   const { session } = await verifierService.createVerifySession(verifyConf, CONFIG.employerId);
   console.log('[Step 7] Session ID:', session.id);
+  console.log('[Step 7] Session status:', session.status);
   console.log('[Step 7] Retrieving proof request from verifier');
   const proofReq = await verifierService.getProofRequest(session.id) as any;
+  console.log('[Step 7] Proof request received');
+  console.log('  - Request ID:', proofReq.id);
+  console.log('  - Request Type:', proofReq.type);
+  console.log('  - Thread ID:', proofReq.thid);
   console.log('[Step 7] Holder generating zero-knowledge proof');
   const scope = proofReq.body.scope[0];
   const zkRequest = {

@@ -87,6 +87,7 @@ export class VerifierService implements VerifierInterface {
 
   async handleProofCallback(verify_id: string, response: ProofResponse) {
     try {
+      console.log('Need to handle proof callback for session:', verify_id);
       const { data: session, error: sessionError } = await this.db
         .from(Tables.VERIFICATION_SESSIONS)
         .select('*')
@@ -101,7 +102,9 @@ export class VerifierService implements VerifierInterface {
       if (!validateProofResp(response)) {
         throw new Error('Proof response format validation failed');
       }
+      console.log('Proof from holder DID:', response.from);
       const proof_request = session.proof_request as unknown as ProofRequest;
+      console.log('Verifying zero-knowledge proof');
       const proofVerification = await this.verifyProof(response, proof_request);
       if (!proofVerification.verified) {
         const result: VerificationResult = {
@@ -121,8 +124,8 @@ export class VerifierService implements VerifierInterface {
         await this.updateSessionResult(verify_id, 'rejected', result);
         return result;
       }
+      console.log('Performing credential checks');
       const policy = session.policy as unknown as VerificationPolicy;
-      // Perform all verification checks
       const checks = {
         proof_valid: proofVerification.verified,
         issuer_allowed: verifyIssuerAuth(
@@ -134,16 +137,17 @@ export class VerifierService implements VerifierInterface {
         not_expired: false,
         constraints_satisfied: true,
       };
-      // Check credential validity on-chain
       if (proofVerification.cred_id) {
         const validity = await checkCredOnChain(proofVerification.cred_id);
         checks.not_revoked = validity.isValid && !validity.reason.includes('Revoked');
         checks.not_expired = validity.isValid && !validity.reason.includes('expired');
+        console.log('On-chain validity:', validity.isValid);
       } else {
         checks.not_revoked = true;
         checks.not_expired = true;
       }
       const verified = Object.values(checks).every((check) => check === true);
+      console.log('All verification checks:', checks);
       const result: VerificationResult = {
         verified,
         holder_did: proofVerification.holder_did,
@@ -154,6 +158,8 @@ export class VerifierService implements VerifierInterface {
         disclosed_attributes: proofVerification.disclosed_attributes,
         failure_reason: verified ? undefined : 'Credential verification checks failed',
       };
+      console.log('Verification result:', verified ? 'SUCCESS' : 'FAILED');
+      console.log('Disclosed attributes:', proofVerification.disclosed_attributes);
       await this.updateSessionResult(verify_id, verified ? 'verified' : 'rejected', result);
       await this.db
         .from(Tables.AUDIT_LOGS)

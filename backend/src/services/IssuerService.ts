@@ -84,6 +84,7 @@ export class IssuerService implements IssuerInterface {
       if (!issuerDID || typeof issuerDID !== 'string' || !issuerDID.startsWith('did:')) {
           throw new Error(`Invalid Issuer DID from SDK: ${issuerDID}`);
       }
+      console.log('Issuer DID:', issuerDID);
       const issuer_did = core.DID.parse(issuerDID);
       const claimReq = {
         credentialSchema: config.schemaUrl,
@@ -95,10 +96,12 @@ export class IssuerService implements IssuerInterface {
           id: 'https://rhs-staging.polygonid.me'
         }
       };
+      console.log('Issuing credential to holder:', prepared.holder_did);
       const issuedCred = await this.sdk.identityWallet.issueCredential(issuer_did, claimReq);
       // Extract UUID from URN or use the ID as is. issuedCred.id is generally "urn:uuid:...".
       const cred_id_parts = issuedCred.id.split(':');
       const cred_id = cred_id_parts[cred_id_parts.length - 1];
+      console.log('Credential created with ID:', cred_id);
       const mtResult = await this.sdk.identityWallet.addCredentialsToMerkleTree(
         [issuedCred], issuer_did
       );
@@ -134,9 +137,10 @@ export class IssuerService implements IssuerInterface {
       }
       const isOldStateGenesis = oldRootBigInt === 0n;
       // Publish State to Polygon ID State Contract. makes the credential verifiable by the Privado ID App
+      console.log('New Merkle root:', merkle_root);
       if (config.enableZkProof) {
         try {
-          console.log('Starting state transition (ZK Proof generation)...');
+          console.log('Starting state transition (ZK Proof generation)');
           const provider = new ethers.JsonRpcProvider(config.rpcUrl);
           const wallet = new ethers.Wallet(config.issuerPrivateKey, provider);
           // SDK expects an ethers Signer to send the transaction
@@ -147,17 +151,18 @@ export class IssuerService implements IssuerInterface {
             this.sdk.stateStorage,
             wallet as any
           );
-          console.log('State transition published:', txId);
+          console.log('State transition published with tx:', txId);
         } catch (error) {
           console.warn('Failed to publish ZK Proof', error);
         }
       }
       const cred_hash = this.blockchain.hashCredential(issuedCred);
       const ipfs_cid = await this.ipfs.upload(issuedCred, true, prepared.holder_did);
+      console.log('Credential uploaded to IPFS with CID:', ipfs_cid);
       const expires_at_timestamp = request.expiration_date
         ? dateToTimestamp(new Date(request.expiration_date))
         : 0;
-      // Anchor credential on blockchain
+      console.log('Anchoring credential on blockchain');
       const blockchainResult = await this.blockchain.issueCredOnChain(
         prepared.holder_did,
         cred_hash,
@@ -165,6 +170,7 @@ export class IssuerService implements IssuerInterface {
         ipfs_cid,
         expires_at_timestamp
       );
+      console.log('Blockchain transaction hash:', blockchainResult.txHash);
       const { error: insertError } = await this.db
         .from(Tables.CREDENTIAL_RECORDS)
         .insert({
