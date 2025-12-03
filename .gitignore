@@ -60,3 +60,4 @@ build/
 tempdata/
 
 *.zip
+backend/testdata/*

@@ -1,6 +1,6 @@
 {
   "watch": ["src"],
   "ext": "ts,json",
-  "ignore": ["data/*", "dist/*", "node_modules/*", "scripts/*", "wallet.json"],
+  "ignore": ["data/*", "dist/*", "node_modules/*", "scripts/*", "testdata/*"],
   "exec": "ts-node src/index.ts"
 }
