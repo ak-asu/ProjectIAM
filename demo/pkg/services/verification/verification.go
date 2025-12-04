@@ -2,6 +2,7 @@ package verification
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -121,13 +122,18 @@ func (v *VerificationService) CreateVerificationRequest(
 	// This defines what the wallet needs to prove
 	zkpQuery := protocol.ZeroKnowledgeProofRequest{
 		ID: 1, // Request ID
-		// Use MTP (Merkle Tree Proof) circuit for on-chain credentials
-		// This circuit validates the credential is in the issuer's published merkle tree on blockchain
-		CircuitID: "credentialAtomicQueryMTPV2OnChain",
+		// Use MTP (Merkle Tree Proof) circuit for OFF-CHAIN credentials
+		// This circuit validates the credential is in the issuer's published merkle tree
+		// NOTE: For off-chain verification, use "credentialAtomicQueryMTPV2" (without "OnChain" suffix)
+		// "credentialAtomicQueryMTPV2OnChain" is only for on-chain/smart contract verification
+		CircuitID: "credentialAtomicQueryMTPV2",
 		Query: map[string]interface{}{
 			"allowedIssuers": []string{"*"}, // Accept credentials from any issuer (can be restricted to specific DIDs)
 			"context":        v.jsonLdContextURL, // CRITICAL: Must use JSON-LD context URL from config, not JSON schema URL
 			"type":           verificationReq.CredentialType,
+			// Skip revocation check since wallet cannot access local Hardhat blockchain
+			// This allows credentials with on-chain status to be verified without blockchain access
+			"skipClaimRevocationCheck": true,
 		},
 	}
 
@@ -148,6 +154,16 @@ func (v *VerificationService) CreateVerificationRequest(
 	fmt.Printf("[VERIFICATION] Credential type: %s\n", verificationReq.CredentialType)
 	fmt.Printf("[VERIFICATION] Query conditions: %+v\n", verificationReq.Query)
 	fmt.Printf("[VERIFICATION] Disclosed fields: %+v\n", verificationReq.Disclose)
+	fmt.Printf("[VERIFICATION] Full ZKP Query: %+v\n", zkpQuery.Query)
+	fmt.Printf("[VERIFICATION] ZKP Params: %+v\n", zkpQuery.Params)
+	fmt.Printf("[VERIFICATION] Request ID: %s\n", request.ID)
+	fmt.Printf("[VERIFICATION] Request ThreadID: %s\n", request.ThreadID)
+	fmt.Printf("[VERIFICATION] Request From: %s\n", request.From)
+
+	// Print complete request as JSON for debugging
+	if requestJSON, err := json.MarshalIndent(request, "", "  "); err == nil {
+		fmt.Printf("[VERIFICATION] Complete request JSON:\n%s\n", string(requestJSON))
+	}
 
 	return request, sessionID, nil
 }

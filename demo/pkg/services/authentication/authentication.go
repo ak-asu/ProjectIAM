@@ -62,11 +62,11 @@ func (a *AuthenticationService) Verify(ctx context.Context,
 		// We use a pool of pre-generated valid DIDs generated from dummy addresses
 		// These DIDs correspond to contract addresses (0x0000...0001, 0x0000...0002, etc.)
 		validDemoDIDs := []string{
-			"did:iden3:privado:test:2Skqvp4vnSFtq5bgAXbDs1Fs4AA5QGpRut9mCDfGdm", // From address 0x0000...0001
-			"did:iden3:privado:test:2Skqvp4vnSFtq5bgAXbDs1Fs4AA5QGpRut9mCDfcC7", // From address 0x0000...0002
-			"did:iden3:privado:test:2Skqvp4vnSFtq5bgAXbDs1Fs4AA5QGpRut9mCDfwkT", // From address 0x0000...0003
-			"did:iden3:privado:test:2Skqvp4vnSFtq5bgAXbDs1Fs4AA5QGpRut9mCDgHJo", // From address 0x0000...0004
-			"did:iden3:privado:test:2Skqvp4vnSFtq5bgAXbDs1Fs4AA5QGpRut9mCDgcs9", // From address 0x0000...0005
+			"did:iden3:privado:main:2SZDsdYordSGMMQVXTVbCb7W834NBTBpkKZUAFS8pw", // From address 0x0000...0001
+			"did:iden3:privado:main:2SZDsdYordSGMMQVXTVbCb7W834NBTBpkKZUAFSUPH", // From address 0x0000...0002
+			"did:iden3:privado:main:2SZDsdYordSGMMQVXTVbCb7W834NBTBpkKZUAFSowd", // From address 0x0000...0003
+			"did:iden3:privado:main:2SZDsdYordSGMMQVXTVbCb7W834NBTBpkKZUAFT9Vy", // From address 0x0000...0004
+			"did:iden3:privado:main:2SZDsdYordSGMMQVXTVbCb7W834NBTBpkKZUAFTV4K", // From address 0x0000...0005
 		}
 		// Use session ID to deterministically select a demo DID
 		sessionNum, _ := strconv.Atoi(sessionID)

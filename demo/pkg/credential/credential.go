@@ -43,6 +43,8 @@ func NewCredential(issuer *w3c.DID, credentialRequest *CredentialRequest, jsonSc
 	}
 	issuanceTime := time.Now().UTC()
 
+	// Build on-chain credential status
+	// The wallet will skip revocation check because verification request has skipClaimRevocationCheck=true
 	credentialStatus, err := buildOnchainCredentialStatus(issuer, credentialRequest)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to build onchain credential status")

@@ -117,7 +117,6 @@ func (h *VerificationHandlers) CreateVerificationRequest(w http.ResponseWriter, 
 //   - 404 Not Found if session not found
 func (h *VerificationHandlers) VerificationCallback(w http.ResponseWriter, r *http.Request) {
 	sessionID := r.URL.Query().Get("sessionId")
-	fmt.Printf("[VERIFICATION] Callback received for sessionID: %s\n", sessionID)
 
 	if sessionID == "" {
 		logger.Error("sessionId query parameter is required")
@@ -132,7 +131,8 @@ func (h *VerificationHandlers) VerificationCallback(w http.ResponseWriter, r *ht
 		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 		return
 	}
-	fmt.Printf("[VERIFICATION] Received proof token, length: %d bytes\n", len(tokenBytes))
+
+	fmt.Printf("[VERIFICATION CALLBACK] Proof received from wallet - sessionID: %s, size: %d bytes\n", sessionID, len(tokenBytes))
 
 	// Verify the ZKP proof
 	// This performs FULL verification:
@@ -143,14 +143,14 @@ func (h *VerificationHandlers) VerificationCallback(w http.ResponseWriter, r *ht
 	// NO DEMO_MODE bypass - always validates against blockchain
 	userDID, err := h.verificationService.VerifyProof(r.Context(), sessionID, tokenBytes)
 	if err != nil {
-		fmt.Printf("[VERIFICATION] Proof verification FAILED: %v\n", err)
+		fmt.Printf("[VERIFICATION CALLBACK] Proof verification FAILED - sessionID: %s, error: %v\n", sessionID, err)
 		logger.WithError(err).Error("Failed to verify proof",
 			slog.String("sessionID", sessionID))
 		http.Error(w, "Proof verification failed", http.StatusUnauthorized)
 		return
 	}
 
-	fmt.Printf("[VERIFICATION] Proof verified successfully! User DID: %s\n", userDID)
+	fmt.Printf("[VERIFICATION CALLBACK] Proof verification SUCCESS - sessionID: %s, userDID: %s\n", sessionID, userDID)
 
 	// Return success response with verified DID
 	w.Header().Set("Content-Type", "application/json")
@@ -185,7 +185,7 @@ func (h *VerificationHandlers) VerificationCallback(w http.ResponseWriter, r *ht
 //
 //	{
 //	  "status": "verified",
-//	  "did": "did:iden3:privado:test:..."
+//	  "did": "did:iden3:privado:main:..."
 //	}
 //
 // Response (if pending):
