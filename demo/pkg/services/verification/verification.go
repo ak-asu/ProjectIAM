@@ -21,10 +21,10 @@ var (
 
 // VerificationService handles credential verification requests and proof validation
 type VerificationService struct {
-	verifier           *auth.Verifier // Reuses the same verifier as authentication
-	callbackURL        string          // Base callback URL for this service
-	verifierDID        string          // The verifier's DID (required in authorization requests)
-	jsonLdContextURL   string          // JSON-LD context URL for credential verification
+	verifier         *auth.Verifier // Reuses the same verifier as authentication
+	callbackURL      string         // Base callback URL for this service
+	verifierDID      string         // The verifier's DID (required in authorization requests)
+	jsonLdContextURL string         // JSON-LD context URL for credential verification
 }
 
 // NewVerificationService creates a new verification service
@@ -128,9 +128,13 @@ func (v *VerificationService) CreateVerificationRequest(
 		// "credentialAtomicQueryMTPV2OnChain" is only for on-chain/smart contract verification
 		CircuitID: "credentialAtomicQueryMTPV2",
 		Query: map[string]interface{}{
-			"allowedIssuers": []string{"*"}, // Accept credentials from any issuer (can be restricted to specific DIDs)
+			"allowedIssuers": []string{"*"},      // demo: accept any issuer
 			"context":        v.jsonLdContextURL, // CRITICAL: Must use JSON-LD context URL from config, not JSON schema URL
 			"type":           verificationReq.CredentialType,
+			"schema": map[string]interface{}{ // schema descriptor (type + URL) used by wallets to resolve vocab
+				"type": verificationReq.CredentialType,
+				"url":  verificationReq.SchemaURL,
+			},
 			// Skip revocation check since wallet cannot access local Hardhat blockchain
 			// This allows credentials with on-chain status to be verified without blockchain access
 			"skipClaimRevocationCheck": true,
@@ -139,7 +143,8 @@ func (v *VerificationService) CreateVerificationRequest(
 
 	// Add credential subject fields to query if any were specified
 	if len(credentialSubject) > 0 {
-		zkpQuery.Query["credentialSubject"] = credentialSubject
+		// Align with Query-based request format (req key) expected by Polygon ID / Privado ID wallets
+		zkpQuery.Query["req"] = credentialSubject
 	}
 
 	// Append the ZKP query to the request scope

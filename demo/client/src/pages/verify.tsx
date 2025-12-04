@@ -25,11 +25,10 @@ const VerifyPage = () => {
     setQrCodeData(null);
 
     try {
-      // Get context URL from environment
-      // Must use public URL (ngrok) so mobile wallet can access it
-      // Note: We use the JSON-LD context URL, not the schema URL
+      // Public URLs (wallet must reach them)
       const issuerUrl = process.env.NEXT_PUBLIC_ISSUER_URL || 'http://localhost:8080';
-      const contextUrl = `${issuerUrl}/schemas/degree-credential-context.jsonld`;
+      const schemaUrl =
+        process.env.NEXT_PUBLIC_DEGREE_SCHEMA_URL || `${issuerUrl}/schemas/degree-credential-schema.json`;
 
       // Build query based on user input
       const query: any = {};
@@ -54,7 +53,7 @@ const VerifyPage = () => {
       // Create verification request for DegreeCredential
       const verificationRequest = {
         credentialType: 'DegreeCredential',
-        schemaUrl: contextUrl, // Using context URL for Polygon ID compatibility
+        schemaUrl: schemaUrl, // JSON schema URL; context is injected by backend config
         query: query,
         disclose: disclose,
       };

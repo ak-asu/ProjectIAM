@@ -61,12 +61,15 @@ func (a *AuthenticationService) Verify(ctx context.Context,
 		// Generate a demo DID for this session using a valid base58-encoded identifier
 		// We use a pool of pre-generated valid DIDs generated from dummy addresses
 		// These DIDs correspond to contract addresses (0x0000...0001, 0x0000...0002, etc.)
+		// Use Amoy-prefixed demo DIDs so any downstream status/verification stays on the same chain.
+		// Demo identities derived from zeroish addresses on Polygon Amoy
+		// (consistent blockchain/network bits to avoid ParseClaim errors)
 		validDemoDIDs := []string{
-			"did:iden3:privado:main:2SZDsdYordSGMMQVXTVbCb7W834NBTBpkKZUAFS8pw", // From address 0x0000...0001
-			"did:iden3:privado:main:2SZDsdYordSGMMQVXTVbCb7W834NBTBpkKZUAFSUPH", // From address 0x0000...0002
-			"did:iden3:privado:main:2SZDsdYordSGMMQVXTVbCb7W834NBTBpkKZUAFSowd", // From address 0x0000...0003
-			"did:iden3:privado:main:2SZDsdYordSGMMQVXTVbCb7W834NBTBpkKZUAFT9Vy", // From address 0x0000...0004
-			"did:iden3:privado:main:2SZDsdYordSGMMQVXTVbCb7W834NBTBpkKZUAFTV4K", // From address 0x0000...0005
+			"did:iden3:polygon:amoy:x6x5sor7zpxU42SmRhq9UeFcf5SnqZjLXbmLbH2BR",  // 0x...0001
+			"did:iden3:polygon:amoy:x6x5sor7zpxU42SmRhq9UeFcf5SnqZjLXbmLbHMjm",  // 0x...0002
+			"did:iden3:polygon:amoy:x6x5sor7zpxU42SmRhq9UeFcf5SnqZjLXbmLbHhJ7",  // 0x...0003
+			"did:iden3:polygon:amoy:x6x5sor7zpxU42SmRhq9UeFcf5SnqZjLXbmLbJ2rT",  // 0x...0004
+			"did:iden3:polygon:amoy:x6x5sor7zpxU42SmRhq9UeFcf5SnqZjLXbmLbJNQo",  // 0x...0005
 		}
 		// Use session ID to deterministically select a demo DID
 		sessionNum, _ := strconv.Atoi(sessionID)

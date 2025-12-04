@@ -103,8 +103,12 @@ fi
 echo ""
 
 echo -e "${YELLOW}Step 7: Configuring environment variables...${NC}"
-# Update .env file with deployed addresses
-cat > .env <<EOL
+# If a .env already exists (e.g., pointing to a public network), do NOT overwrite it.
+if [ -f .env ]; then
+    echo -e "${YELLOW}  .env already exists — leaving it untouched.${NC}"
+else
+    echo -e "${YELLOW}  Generating .env for local Hardhat (dev)${NC}"
+    cat > .env <<EOL
 # State contract addresses for different networks
 # Hardhat runs on chain 31337, mapped to chain 21000 (privado:main) for DID operations
 SUPPORTED_STATE_CONTRACTS="21000=$STATE_ADDRESS"
@@ -134,12 +138,17 @@ NEXT_PUBLIC_DEGREE_SCHEMA_URL="https://unincisive-bruce-exemplarily.ngrok-free.d
 # JSON-LD context URL for verification requests
 DEGREE_JSONLD_CONTEXT_URL="https://unincisive-bruce-exemplarily.ngrok-free.dev/schemas/degree-credential-context.jsonld"
 EOL
+fi
 
 # Create .env.local for Next.js build-time environment variables
 # IMPORTANT: Must use public URL so mobile wallets can access the schema
-cat > client/.env.local <<EOL
+if [ -f client/.env.local ]; then
+    echo -e "${YELLOW}  client/.env.local already exists — leaving it untouched.${NC}"
+else
+    cat > client/.env.local <<EOL
 NEXT_PUBLIC_DEGREE_SCHEMA_URL=https://unincisive-bruce-exemplarily.ngrok-free.dev/schemas/degree-credential-schema.json
 EOL
+fi
 echo -e "${GREEN}✓ Environment configured${NC}"
 echo ""
 
