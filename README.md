@@ -1,6 +1,6 @@
 # Unicredify - Decentralized Identity and Access Management (IAM) for University Credentials Verification System
 
-This project implements a privacy-preserving decentralized Identity and Access Management system for university credentials. It is inspired by platforms like UniCred.io with an innovation to introduce zero-knowledge proofs for enhanced privacy. The system enables universities to issue verifiable digital credentials to students who can then selectively share these credentials with employers while maintaining complete control and data integrity.
+This project implements a privacy-preserving decentralized Identity and Access Management system for university credentials. It is inspired by platforms like UniCred.io with an innovation to introduce zero-knowledge proofs for enhanced privacy. The system enables universities to issue verifiable digital credentials to students who can then selectively share these credentials with employers while maintaining complete control and data integrity. It is built on the Polygon blockchain and integrated with Privado ID infrastructure. The application has on-chain credential anchoring for authenticity and off-chain zero-knowledge proof verification for efficiency and privacy.
 
 ## Overview
 
@@ -198,9 +198,10 @@ Dummy data can be found in end of backend/schema.sql
 
 1. Update environment variables for production endpoints
 2. Deploy smart contracts to Polygon mainnet
-3. Deploy frontend on Vercel
-4. Deploy backend on Render
-5. Update CORS settings and ensure all endpoints use HTTPS
+3. Deploy backend/schemas to Github Pages or your hosting provider and update the url values in them
+4. Deploy frontend on Vercel
+5. Deploy backend on Render
+6. Update CORS settings and ensure all endpoints use HTTPS
 
 ### Security Considerations
 
@@ -211,6 +212,94 @@ Dummy data can be found in end of backend/schema.sql
 - **Revocation**: Real-time revocation checking before verification
 - **Audit Trail**: Immutable logs with cryptographic integrity
 - **HTTPS and CORS**: All endpoints require HTTPS in production and are restricted to authorized domains
+
+## Usage
+
+Check blockchain transaction status on Polygonscan
+
+### For Students (Holders)
+
+1. Install the Privado ID mobile app from Play Store. Open the wallet and create a new identity.
+2. Authenticate with Your University Portal:
+   - Visit your application's student portal
+   - Click "Authenticate with DID"
+   - Scan the QR code displayed with your Privado ID wallet
+   - Approve the authentication request in your wallet
+   - After DID authentication, enter your university email and password to bind the DID with your student account
+   - Future logins will only require scanning the QR code
+3. Receive Credential:
+   - Once the university issues your credential, scan the credential offer QR code with your Privado ID wallet
+   - Tap "Claim" to import the credential into your wallet
+4. Verification Request:
+   - The employer will provide a verification QR code
+   - Scan the QR code with your Privado ID wallet
+5. Approve Sharing:
+   - The wallet shows what information the employer is requesting
+   - Tap "Accept" to generate and submit a zero-knowledge proof
+   - The employer receives instant verification without accessing your full transcript
+
+### For Universities (Issuers)
+1. Access the University Portal:
+   - Navigate to university portal
+   - Authenticate using the admin API key
+2. Issue the Credential:
+   - Enter student ID and credential details
+   - Click "Issue Credential"
+   - The system processes the issuance (20-30 seconds):
+     - Creates a W3C Verifiable Credential
+     - Anchors the credential on the Polygon blockchain
+     - Encrypts and stores the credential on IPFS
+     - Generates a credential offer QR code
+   - Display or email the QR code to the student, so he can accept it in his wallet
+3. Revoke a Credential:
+   - Navigate to the Manage Credential tab
+   - Click "Revoke"
+   - Enter a required reason and confirm
+   - The credential is immediately invalidated on the blockchain
+   - Future verification attempts will fail with the revocation reason
+
+### For Employers (Verifiers)
+
+1. Log in with email and password configured in database
+2. Set requirements or constraints for verification policy like:
+   - Graduation year must be after 2025
+   - GPA must be at least 3.0
+   - Degree must be in Computer Science
+3. Generate Verification QR Code:
+   - Click "Generate QR"
+   - The system creates a unique verification session
+   - Display the QR code to the candidate, which he scans using Privado ID wallet
+4. The verification portal automatically refreshes when the candidate responds (30-60 seconds)
+
+**Understanding Zero-Knowledge Verification**
+
+- Verification happens instantly without contacting the university
+- The candidate's wallet generates a cryptographic proof that reveals only what you requested
+- You get strong assurance of authenticity through blockchain verification
+- The candidate maintains privacy where you do not see their full academic record
+- The verification is tamper-proof where credentials cannot be altered
+
+### Common Workflows
+
+**Workflow 1: Student Receives Degree Credential**
+```
+University Admin → Select Student → Configure Credential → Issue → Generate QR
+Student → Scan QR → Claim → Credential Stored in Wallet
+```
+
+**Workflow 2: Employer Verifies Candidate's Degree**
+```
+Employer → Create Verification Request → Set Policy → Generate QR
+Candidate → Scan QR → Review Request → Approve Sharing → Generate Proof
+Employer → Receive Instant Verification → View Results → Download Report
+```
+
+**Workflow 3: University Revokes Credential**
+```
+University Admin → Locate Credential → Click Revoke → Enter Reason → Confirm
+System → Update Blockchain → Mark as Revoked → Log Audit Trail
+Future Verifications automatically fail with Revocation reason
+```
 
 ## License
 

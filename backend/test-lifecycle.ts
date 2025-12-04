@@ -68,7 +68,8 @@ enum TestFlow {
   COMPLETE_LIFECYCLE = '1',
   CREDENTIAL_TAMPERING = '2',
   ISSUE_ONLY = '3',
-  VERIFY_ONLY = '4'
+  VERIFY_ONLY = '4',
+  REVOKE_AND_VERIFY = '5'
 }
 
 async function selectTestFlow(): Promise<TestFlow> {
@@ -78,7 +79,8 @@ async function selectTestFlow(): Promise<TestFlow> {
   console.log('2. Credential Tampering Test');
   console.log('3. Issue Credential Only');
   console.log('4. Verify Credential Only');
-  const choice = await prompt(rl, 'Enter your choice (1-4): ');
+  console.log('5. Revoke Credential & Verify');
+  const choice = await prompt(rl, 'Enter your choice (1-5): ');
   rl.close();
   if (!Object.values(TestFlow).includes(choice as TestFlow)) {
     console.log('\nRunning Complete Lifecycle');
@@ -91,7 +93,7 @@ async function getConfigFromUser(flow: TestFlow): Promise<TestConfig> {
   const rl = createInterface();
   const studentId = await prompt(rl, 'Enter Student ID (e.g., STU001): ');
   let employerId = 'N/A';
-  if (flow === TestFlow.COMPLETE_LIFECYCLE || flow === TestFlow.VERIFY_ONLY) {
+  if (flow === TestFlow.COMPLETE_LIFECYCLE || flow === TestFlow.VERIFY_ONLY || flow === TestFlow.REVOKE_AND_VERIFY) {
     employerId = await prompt(rl, 'Enter Employer ID (e.g., EMP001): ');
   }
   const credentialType = await prompt(rl, 'Enter Credential Type (default: DegreeCredential): ') || 'DegreeCredential';
@@ -526,6 +528,149 @@ async function runVerifyOnly(CONFIG: TestConfig, context: WalletContext) {
   console.log('Verification completed');
 }
 
+async function runRevokeAndVerify(CONFIG: TestConfig, context: WalletContext) {
+  console.log('Revoke Credential & Verify');
+  const CRED_FILE = path.join(__dirname, 'testdata', `credentials-${CONFIG.studentId}.json`);
+  if (!fs.existsSync(CRED_FILE)) {
+    throw new Error('No credential found. Run "Issue Credential Only" first.');
+  }
+  const credData = JSON.parse(fs.readFileSync(CRED_FILE, 'utf-8'));
+  const credential = credData.credential;
+  console.log('Found credential:', credential.id);
+
+  console.log('Loading credential to wallet');
+  const w3cCredential = W3CCredential.fromJSON(credential);
+  await context.credWallet.save(w3cCredential);
+
+  console.log('Verifying credential before revocation');
+  const verifierService = new VerifierService();
+  const verifyConf = {
+    credentialType: CONFIG.credentialType,
+    allowedIssuers: ['*'],
+    schemaUrl: 'https://kaushal-2001.github.io/DegreeIAM/DegreeCredential-v1.json-ld',
+    constraints: [
+      { field: 'degree', operator: '$eq' as const, value: 'Bachelor of Science' }
+    ]
+  };
+
+  const { session: preSession } = await verifierService.createVerifySession(verifyConf, CONFIG.employerId);
+  console.log('Pre-revocation session:', preSession.id);
+
+  const preProofReq = await verifierService.getProofRequest(preSession.id) as any;
+  const preScope = preProofReq.body.scope[0];
+  const preZkRequest = {
+    id: 1,
+    circuitId: preScope.circuitId as CircuitId,
+    query: preScope.query,
+    optional: false
+  };
+
+  const { did: preDid } = await context.holderWallet.createIdentity({
+    method: core.DidMethod.Iden3,
+    blockchain: core.Blockchain.Polygon,
+    networkId: core.NetworkId.Amoy,
+    seed: crypto.createHash('sha256').update(context.seedPhrase).digest(),
+    revocationOpts: { type: CredentialStatusType.Iden3ReverseSparseMerkleTreeProof, id: 'https://rhs-staging.polygonid.me' }
+  });
+
+  const preZkResponse = await context.proofService.generateProof(preZkRequest, preDid);
+  const preProofResp = {
+    id: preProofReq.id,
+    typ: 'application/iden3comm-plain-json',
+    type: 'https://iden3-communication.io/proofs/1.0/response',
+    thid: preProofReq.thid,
+    body: {
+      scope: [{
+        id: preZkResponse.id,
+        circuitId: preZkResponse.circuitId,
+        proof: {
+          proof: preZkResponse.proof,
+          pub_signals: preZkResponse.pub_signals
+        }
+      }]
+    },
+    from: context.holderDid
+  };
+
+  const preVerifiedResult = await verifierService.handleProofCallback(preSession.id, preProofResp as any);
+  if (preVerifiedResult.verified) {
+    console.log('Pre-revocation: VERIFIED');
+  } else {
+    console.error('Pre-revocation: FAILED (unexpected)');
+  }
+
+  console.log('\nRevoking credential');
+  const issuerService = new IssuerService();
+  const revokeResult = await issuerService.revokeCredential(
+    credential.id,
+    'Testing revocation flow',
+    'test-system'
+  );
+
+  if (revokeResult.success) {
+    console.log('Credential revoked successfully');
+    console.log('TX Hash:', revokeResult.tx_hash);
+  } else {
+    console.error('Revocation failed:', revokeResult.error);
+    throw new Error(`Revocation failed: ${revokeResult.error}`);
+  }
+
+  console.log('\nVerifying after revocation');
+  const { session: postSession } = await verifierService.createVerifySession(verifyConf, CONFIG.employerId);
+  console.log('Post-revocation session:', postSession.id);
+
+  try {
+    const postProofReq = await verifierService.getProofRequest(postSession.id) as any;
+    const postScope = postProofReq.body.scope[0];
+    const postZkRequest = {
+      id: 1,
+      circuitId: postScope.circuitId as CircuitId,
+      query: postScope.query,
+      optional: false
+    };
+
+    const { did: postDid } = await context.holderWallet.createIdentity({
+      method: core.DidMethod.Iden3,
+      blockchain: core.Blockchain.Polygon,
+      networkId: core.NetworkId.Amoy,
+      seed: crypto.createHash('sha256').update(context.seedPhrase).digest(),
+      revocationOpts: { type: CredentialStatusType.Iden3ReverseSparseMerkleTreeProof, id: 'https://rhs-staging.polygonid.me' }
+    });
+
+    const postZkResponse = await context.proofService.generateProof(postZkRequest, postDid);
+    const postProofResp = {
+      id: postProofReq.id,
+      typ: 'application/iden3comm-plain-json',
+      type: 'https://iden3-communication.io/proofs/1.0/response',
+      thid: postProofReq.thid,
+      body: {
+        scope: [{
+          id: postZkResponse.id,
+          circuitId: postZkResponse.circuitId,
+          proof: {
+            proof: postZkResponse.proof,
+            pub_signals: postZkResponse.pub_signals
+          }
+        }]
+      },
+      from: context.holderDid
+    };
+
+    const postVerifiedResult = await verifierService.handleProofCallback(postSession.id, postProofResp as any);
+    if (postVerifiedResult.verified) {
+      console.error('Post-revocation: VERIFIED (security breach!)');
+    } else {
+      console.log('Post-revocation: FAILED (expected)');
+      console.log('Reason:', postVerifiedResult.failure_reason);
+    }
+  } catch (error) {
+    console.log('Proof generation failed after revocation');
+    console.log('Error:', error instanceof Error ? error.message : error);
+  }
+
+  console.log('Revocation test completed');
+}
+
 async function runTestCycle(flow: TestFlow, CONFIG: TestConfig) {
   const context = await initializeWalletAndServices(CONFIG);
   switch (flow) {
@@ -540,6 +685,9 @@ async function runTestCycle(flow: TestFlow, CONFIG: TestConfig) {
       break;
     case TestFlow.VERIFY_ONLY:
       await runVerifyOnly(CONFIG, context);
+      break;
+    case TestFlow.REVOKE_AND_VERIFY:
+      await runRevokeAndVerify(CONFIG, context);
       break;
     default:
       throw new Error(`Unknown: ${flow}`);
